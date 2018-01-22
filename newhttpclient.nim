@@ -731,28 +731,31 @@ proc generateHeaders(requestUrl: Uri, httpMethod: string,
   # HTTP/1.1\c\l
   result.add(" HTTP/1.1\c\L")
 
+  var httpMimeHeaders = newHttpHeaders()
+
   # Host header.
   if requestUrl.port == "":
-    add(result, "Host: " & requestUrl.hostname & "\c\L")
+    httpMimeHeaders["Host"] = requestUrl.hostname 
   else:
-    add(result, "Host: " & requestUrl.hostname & ":" & requestUrl.port & "\c\L")
+    httpMimeHeaders["Host"] = requestUrl.hostname & ":" & requestUrl.port
 
   # Connection header.
   if not headers.hasKey("Connection"):
-    add(result, "Connection: Keep-Alive\c\L")
+      httpMimeHeaders["Connection"] = "Keep-Alive"
 
   # Content length header.
   if body.len > 0 and not headers.hasKey("Content-Length"):
-    add(result, "Content-Length: " & $body.len & "\c\L")
+    httpMimeHeaders["Content-Length"] = $body.len
 
   # Proxy auth header.
   if not proxy.isNil and proxy.auth != "":
     let auth = base64.encode(proxy.auth, newline = "")
-    add(result, "Proxy-Authorization: basic " & auth & "\c\L")
+    httpMimeHeaders["Proxy-Authorization"] = "basic " & auth
 
   for key, val in headers:
-    add(result, key & ": " & val & "\c\L")
+    httpMimeHeaders[key] = val
 
+  result.addHeaders httpMimeHeaders
   add(result, "\c\L")
 
 type
@@ -1312,4 +1315,12 @@ proc downloadFile*(client: AsyncHttpClient, url: string,
 
 when isMainModule:
   var client = newHttpClient()
-  echo client.getContent("http://google.com")
+  echo client.getContent("http://google.de")
+  # echo client.getContent("http://127.0.0.1:8080")
+  # z@z ~> nc -l 8080
+  # GET / HTTP/1.1
+  # Host: 127.0.0.1:8080
+  # Connection: Keep-Alive
+  # user-agent: Nim httpclient/0.17.3
+
+  # z@z ~> 

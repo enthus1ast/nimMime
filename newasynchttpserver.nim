@@ -33,7 +33,6 @@
 
 import tables, asyncnet, asyncdispatch, parseutils, uri, strutils
 import newhttpcore
-import mime 
 
 export newhttpcore  #except parseHeader
 

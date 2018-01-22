@@ -116,9 +116,9 @@ proc `$`*(msg: Message): string =
   ## stringify for ``Message``.
   result = ""
   var mimeHeaders = newMimeHeaders()
-  mimeHeaders["TO"] =  msg.msgTo
-  mimeHeaders["CC"] =  msg.msgCc
-  mimeHeaders["Subject"] =  msg.msgSubject
+  mimeHeaders["TO"] = msg.msgTo
+  mimeHeaders["CC"] = msg.msgCc
+  mimeHeaders["Subject"] = msg.msgSubject
   for key, value in pairs(msg.msgOtherHeaders):
     mimeHeaders[key] = value
   result.addHeaders mimeHeaders

@@ -11,7 +11,9 @@
 ## ``asynchttpserver`` modules.
 
 import tables, strutils, parseutils
+
 import mime
+export mime
 
 type
   HttpHeaders* = MimeHeaders
