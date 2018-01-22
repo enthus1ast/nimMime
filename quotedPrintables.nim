@@ -39,16 +39,6 @@ proc unQuoted(str: string, destEncoding: string, srcEncoding = "utf-8"): string 
     pos.inc
 
 
-    # case ch.int
-    # of 33..60, 62..126: #9, 32
-    #   result.add $ch
-    # else: 
-    #   let encoded = convert($ch, destEncoding, srcEncoding)
-    #   result.add "="
-    #   result.add encoded[0].ord().toHex(2).toUpper()
-
-
-
 when isMainModule and true:
   assert unQuoted("=E4", "utf-8", "iso-8859-1") == "ä"
   assert unQuoted("=E4=E4", "utf-8", "iso-8859-1") == "ää"
