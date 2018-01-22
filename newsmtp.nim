@@ -125,19 +125,6 @@ proc `$`*(msg: Message): string =
   result.add("\c\L")
   result.add(msg.msgBody)  
 
-  
-  # result = ""
-  # if msg.msgTo.len() > 0:
-  #   result = "TO: " & msg.msgTo.join(", ") & "\c\L"
-  # if msg.msgCc.len() > 0:
-  #   result.add("CC: " & msg.msgCc.join(", ") & "\c\L")
-  # # TODO: Folding? i.e when a line is too long, shorten it...
-  # result.add("Subject: " & msg.msgSubject & "\c\L")
-  # for key, value in pairs(msg.msgOtherHeaders):
-  #   result.add(key & ": " & value & "\c\L")
-
-  # result.add("\c\L")
-  # result.add(msg.msgBody)
 
 proc newSmtp*(useSsl = false, debug=false,
               sslContext = defaultSslContext): Smtp =
@@ -231,9 +218,9 @@ proc close*(smtp: Smtp | AsyncSmtp) {.multisync.} =
 
 when isMainModule:
   echo createMessage("Hello from Nim's SMTP!",
-        "Hello!\nIs this awesome or what?", @["foo@example.org"])
+        "Hello!\nIs this awesome or what?", @["foo@example.org", "baa@example.org"])
 
-when not defined(testing) and isMainModule and false:
+when not defined(testing) and isMainModule and true:
   # To test with a real SMTP service, create a smtp.ini file, e.g.:
   # username = ""
   # password = ""
@@ -250,7 +237,7 @@ when not defined(testing) and isMainModule and false:
   let
     conf = loadConfig("smtp.ini")
     msg = createMessage("Hello from Nim's SMTP!",
-      "Hello!\n Is this awesome or what?", @[conf["recipient"]])
+      "Hello!\n Is this awesome or what?", conf["recipient"].split(",") )
 
   assert conf["smtphost"] != ""
 
@@ -261,7 +248,7 @@ when not defined(testing) and isMainModule and false:
     )
     await client.connect(conf["smtphost"], conf["port"].parseInt.Port)
     await client.auth(conf["username"], conf["password"])
-    await client.sendMail(conf["sender"], @[conf["recipient"]], $msg)
+    await client.sendMail(conf["sender"], conf["recipient"].split(","), $msg)
     await client.close()
     echo "async email sent"
 
@@ -272,7 +259,7 @@ when not defined(testing) and isMainModule and false:
     )
     smtpConn.connect(conf["smtphost"], conf["port"].parseInt.Port)
     smtpConn.auth(conf["username"], conf["password"])
-    smtpConn.sendMail(conf["sender"], @[conf["recipient"]], $msg)
+    smtpConn.sendMail(conf["sender"], conf["recipient"].split(","), $msg)
     smtpConn.close()
     echo "sync email sent"
 

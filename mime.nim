@@ -12,7 +12,8 @@ import tables, strutils, parseutils
 
 type
   MimeHeaders* = ref object
-    table*: TableRef[string, seq[string]]
+    # table*: TableRef[string, seq[string]]
+    table*: OrderedTableRef[string, seq[string]]
 
   MimeHeaderValues* = distinct seq[string]
 
@@ -20,7 +21,7 @@ const headerLimit* = 10_000
 
 proc newMimeHeaders*(): MimeHeaders =
   new result
-  result.table = newTable[string, seq[string]]()
+  result.table = newOrderedTable[string, seq[string]]()
 
 proc newMimeHeaders*(keyValuePairs:
     openarray[tuple[key: string, val: string]]): MimeHeaders =
@@ -28,7 +29,7 @@ proc newMimeHeaders*(keyValuePairs:
   for pair in keyValuePairs:
     pairs.add((pair.key.toLowerAscii(), @[pair.val]))
   new result
-  result.table = newTable[string, seq[string]](pairs)
+  result.table = newOrderedTable[string, seq[string]](pairs)
 
 proc `$`*(headers: MimeHeaders): string =
   return $headers.table
@@ -169,3 +170,12 @@ when isMainModule:
   doAssert test["foobar"] == ""
 
   doAssert parseHeader("foobar:") == ("foobar", @[""])
+
+when isMainModule and true:
+  test = newMimeHeaders()
+  var msg = ""
+  test.add("Connection", "Test")
+  msg.addHeaders(test)
+  msg.add("\c\L")
+  msg.add "body content"
+  echo msg

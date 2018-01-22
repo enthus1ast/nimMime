@@ -104,7 +104,7 @@ proc newHttpHeaders*(): HttpHeaders =
 
 proc newHttpHeaders*(keyValuePairs:
     openarray[tuple[key: string, val: string]]): HttpHeaders = 
-  return newHttpHeaders(keyValuePairs)
+  return newMimeHeaders(keyValuePairs)
 
 proc `==`*(protocol: tuple[orig: string, major, minor: int],
            ver: HttpVersion): bool =
