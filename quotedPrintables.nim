@@ -25,10 +25,14 @@
 #           only meaningful characters are taken from this set of
 #           73 characters.  The base64 encoding follows this rule.
 
-import encodings, strutils, parseutils
+import encodings, strutils
 
 # const MAIL_SAFE = Letters + Digits + {'\'', '(',')','+',',','-','.','/',':','=','?'}
 const MAIL_SAFE = Letters + Digits + {'\'', '(',')','+',',','-','.','/',':','?'}
+
+template addCL() = 
+  result.add "=\c\l"
+  lineChars = 0  
 
 proc quoted(str: string, destEncoding: string, srcEncoding = "utf-8", newlineAt = 76): string =
   ## encodes into Quoted Printables encoding 
@@ -36,30 +40,24 @@ proc quoted(str: string, destEncoding: string, srcEncoding = "utf-8", newlineAt 
   var lineChars = 0
   let enc = convert(str,destEncoding, srcEncoding)
   for ch in enc:
-    # echo lineChars
-    if lineChars >= newlineAt: 
-      echo "newline:", result.len mod newlineAt
-      result.add "=\c\l"
-      lineChars = 0
-      # result.add ch
-      # continue
     case ch.char
     of MAIL_SAFE:
+      if lineChars >= newlineAt - 1: 
+        addCl
       result.add $ch
       lineChars.inc
     else: 
+      if lineChars >= newlineAt - 3: 
+        addCl
       result.add "="
       result.add ch.ord().toHex(2)
       lineChars.inc 3
-
-# iterator strippedLines(str: string): string =
-#   for 
 
 proc unQuoted(str: string, srcEncoding: string, destEncoding = "utf-8"): string =
   ## decodes into dest encoding from quoted printables
   result = ""
   var 
-    pos = 0
+    pos:int
     ch: char
   for line in str.splitLines():
     let mline = strip(line, leading = false, trailing = true, chars = {'='})
@@ -69,40 +67,17 @@ proc unQuoted(str: string, srcEncoding: string, destEncoding = "utf-8"): string 
       if ch == '=':
         let buf = mline[pos+1] & mline[pos+2]
         pos.inc 2 #  skip hex chars
-        var num: char
+        var hexNum: char
         try:
-          num = buf.parseHexInt.char
+          hexNum = buf.parseHexInt.char
         except:
           echo "could not parse char:", buf , " at idx ", pos
-        result.add convert($num, destEncoding, srcEncoding)
+        result.add convert($hexNum, destEncoding, srcEncoding)
       else:
         result.add ch
       pos.inc
-# proc unQuoted(str: string, srcEncoding: string, destEncoding = "utf-8"): string =
-#   ## decodes into dest encoding from quoted printables
-#   result = ""
-#   var 
-#     pos = 0
-#     ch: char
-#   while pos < str.len:
-#     ch = str[pos]
-#     if ch == '=':
-#       let buf = str[pos+1] & str[pos+2]
-#       pos.inc 2 #  skip hex chars
-#       if buf == "\c\l" or buf[0] == '\c': # forced newline
-#         discard # just eat it
-#       else:
-#         var num: char
-#         try:
-#           num = buf.parseHexInt.char
-#         except:
-#           echo "could not parse char:", buf , " at idx ", pos
-#         result.add convert($num, destEncoding, srcEncoding)
-#     else:
-#       result.add ch
-#     pos.inc
 
-echo repeat("a", 100).quoted("iso-8859-1", newLineAt = 73)
+# echo repeat("rabä", 5000).quoted("iso-8859-1", newLineAt = 76)
 const testing = true
 when isMainModule and testing:
   assert unQuoted("=E4", "iso-8859-1") == "ä"
