@@ -28,7 +28,7 @@
 import encodings, strutils
 
 # const MAIL_SAFE = Letters + Digits + {'\'', '(',')','+',',','-','.','/',':','=','?'}
-const MAIL_SAFE = Letters + Digits + {'\'', '(',')','+',',','-','.','/',':','?', ' '}
+const MAIL_SAFE = Letters + Digits + {'\'', '(',')','+',',','-','.','/',':', ' '}
 
 template addCL() = 
   result.add "=\c\l"

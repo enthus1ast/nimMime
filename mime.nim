@@ -8,16 +8,32 @@
 #
 
 ## Contains basic MIME parser
-import tables, strutils, parseutils
+import tables, strutils, parseutils, random
 
 type
+  MimeMessage* = object
+    version*: string
+    header*: MimeHeaders
+    body*: string
+  MimeMessageMultipart* = object
+    version*: string
+    header*: MimeHeaders
+    subtype*: string # like Mixed,Alternative,Digest etc
+    boundary: string
+    body*: seq[MimeMessage]    
   MimeHeaders* = ref object
     # table*: TableRef[string, seq[string]]
     table*: OrderedTableRef[string, seq[string]]
 
   MimeHeaderValues* = distinct seq[string]
 
-const headerLimit* = 10_000
+const 
+  headerLimit* = 10_000
+  mimeNewline* = "\c\L"
+
+
+proc mimeList*(elems: seq[string]): string =
+  return elems.join(", ")
 
 proc newMimeHeaders*(): MimeHeaders =
   new result
@@ -30,6 +46,19 @@ proc newMimeHeaders*(keyValuePairs:
     pairs.add((pair.key.toLowerAscii(), @[pair.val]))
   new result
   result.table = newOrderedTable[string, seq[string]](pairs)
+
+proc newMimeMessage*(): MimeMessage = 
+  result = MimeMessage()
+  result.version = ""
+  result.header = newMimeHeaders()
+  result.body = ""
+
+proc newMimeMessageMultipart*(subtype="mixed"): MimeMessageMultipart = 
+  result = MimeMessageMultipart()
+  result.version = ""
+  result.header = newMimeHeaders()
+  result.subtype = subtype
+  result.body = @[]
 
 proc `$`*(headers: MimeHeaders): string =
   return $headers.table
@@ -134,8 +163,53 @@ proc parseHeader*(line: string): tuple[key: string, value: seq[string]] =
 
 proc addHeaders*(msg: var string, headers: MimeHeaders) =
   ## From asynchttp
+  if headers.len == 0:
+    msg.add mimeNewline
+    return
   for k, v in headers:
-    msg.add(k & ": " & v & "\c\L")    
+    msg.add(k & ": " & v & mimeNewline)  
+
+proc isUniqueBoundary(msgs: seq[MimeMessage], boundary: string): bool =
+  for msg in msgs:
+    if boundary in $msg:
+      return false
+  return true
+
+proc uniqueBoundary*(multi: MimeMessageMultipart): string =
+  ## returns a message wide unique string to use as a boundary
+  while true:
+    result = $rand(1_000..int.high)
+    if multi.body.isUniqueBoundary(result): 
+      break
+
+proc `$`*(msg: MimeMessage): string =
+  result = ""
+  if msg.version.len > 0: 
+    result.add msg.version & mimeNewline
+  result.addHeaders(msg.header)
+  result.add mimeNewline
+  result.add msg.body
+
+proc `$`*(multi: MimeMessageMultipart): string =
+  ## returns the string representation of the multipart message
+  result = ""
+  if multi.version.len > 0: 
+    result.add multi.version & mimeNewline
+  result.addHeaders(multi.header)
+  result.add mimeNewline
+  let boundaryLine = mimeNewline & "--" & multi.boundary & mimeNewline
+  let boundaryLineLast = mimeNewline & "--" & multi.boundary & "--" & mimeNewline
+  for idx, msg in multi.body:
+    result.add boundaryLine
+    result.add $msg
+    if idx == multi.body.len-1:
+      result.add boundaryLineLast # last boundary must be also suffixed by "--"
+      
+
+proc finalize*(multi: var MimeMessageMultipart) = 
+  ## Computes and sets a unique boundary
+  multi.boundary = multi.uniqueBoundary()
+  multi.header["Content-Type"] = """multipart/$#; boundary="$#"""" % @[multi.subtype, multi.boundary]
 
 # let t1 = """MIME-Version: 1.0
 #  Content-Type: multipart/mixed; boundary=frontier
@@ -176,6 +250,50 @@ when isMainModule and true:
   var msg = ""
   test.add("Connection", "Test")
   msg.addHeaders(test)
-  msg.add("\c\L")
+  msg.add(mimeNewline)
   msg.add "body content"
-  echo msg
+  # echo msg
+
+when isMainModule and true: # multipart test
+  var multi = newMimeMessageMultipart()
+  multi.header["to"] = @["foo@nim.org", "baa@nim.org"].mimeList
+  multi.header["subject"] = "multiparted US-ASCII for you"
+  
+  var first = newMimeMessage()
+  first.header["content-type"] = "text/plain"
+  first.body = "i show up in email readers! i do not end with a linebreak!"
+  multi.body.add first
+
+  var second = newMimeMessage()
+  second.header["content-type"] = "text/plain"
+  second.body = "i am another multipart 42924863215779480875955470471231252136"
+  multi.body.add second
+
+  var third = newMimeMessage()
+  third.header["content-type"] = "text/plain"
+  third.header["Content-Disposition"] = """attachment; filename="test.txt""""
+  third.body = "i am a manually attached AND i end with a explicit line break\n"
+  multi.body.add third  
+  # echo "==="
+  # multi.boundary = multi.uniqueBoundary()
+  multi.finalize()
+  echo $multi
+
+
+
+  # var msg = ""
+  # test.add("Connection", "Test")
+  # msg.addHeaders(test)
+  # msg.add(mimeNewline)
+  # msg.add "body content"
+  # echo msg
+
+
+# when isMainModule and true:
+#   test = newMimeHeaders()
+#   var msg = ""
+#   test.add("Connection", "Test")
+#   msg.addHeaders(test)
+#   msg.add(mimeNewline)
+#   msg.add "body content"
+#   echo msg  
