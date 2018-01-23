@@ -25,49 +25,92 @@
 #           only meaningful characters are taken from this set of
 #           73 characters.  The base64 encoding follows this rule.
 
-import encodings, strutils
+import encodings, strutils, parseutils
 
-const MAIL_SAFE = Letters + Digits + {'\'', '(',')','+',',','-','.','/',':','=','?'}
+# const MAIL_SAFE = Letters + Digits + {'\'', '(',')','+',',','-','.','/',':','=','?'}
+const MAIL_SAFE = Letters + Digits + {'\'', '(',')','+',',','-','.','/',':','?'}
 
-proc quoted(str: string, destEncoding: string, srcEncoding = "utf-8"): string =
+proc quoted(str: string, destEncoding: string, srcEncoding = "utf-8", newlineAt = 76): string =
   ## encodes into Quoted Printables encoding 
   result = ""
+  var lineChars = 0
   let enc = convert(str,destEncoding, srcEncoding)
   for ch in enc:
+    # echo lineChars
+    if lineChars >= newlineAt: 
+      echo "newline:", result.len mod newlineAt
+      result.add "=\c\l"
+      lineChars = 0
+      # result.add ch
+      # continue
     case ch.char
-    # of 33..60, 62..126: #9, 32
     of MAIL_SAFE:
       result.add $ch
+      lineChars.inc
     else: 
       result.add "="
-      result.add ch.ord().toHex(2).toUpper()
+      result.add ch.ord().toHex(2)
+      lineChars.inc 3
+
+# iterator strippedLines(str: string): string =
+#   for 
 
 proc unQuoted(str: string, srcEncoding: string, destEncoding = "utf-8"): string =
   ## decodes into dest encoding from quoted printables
   result = ""
   var 
     pos = 0
-    buf = newStringOfCap(2)
     ch: char
-  while pos < str.len:
-    buf.setLen 0
-    ch = str[pos]
-    if ch == '=':
-      buf.add str[pos+1] & str[pos+2]
-      pos.inc 2 # skip hex chars
-      let num = buf.parseHexInt.char
-      result.add convert($num, destEncoding, srcEncoding)
-    else:
-      result.add ch
-    pos.inc
+  for line in str.splitLines():
+    let mline = strip(line, leading = false, trailing = true, chars = {'='})
+    pos = 0
+    while pos < mline.len:
+      ch = mline[pos]
+      if ch == '=':
+        let buf = mline[pos+1] & mline[pos+2]
+        pos.inc 2 #  skip hex chars
+        var num: char
+        try:
+          num = buf.parseHexInt.char
+        except:
+          echo "could not parse char:", buf , " at idx ", pos
+        result.add convert($num, destEncoding, srcEncoding)
+      else:
+        result.add ch
+      pos.inc
+# proc unQuoted(str: string, srcEncoding: string, destEncoding = "utf-8"): string =
+#   ## decodes into dest encoding from quoted printables
+#   result = ""
+#   var 
+#     pos = 0
+#     ch: char
+#   while pos < str.len:
+#     ch = str[pos]
+#     if ch == '=':
+#       let buf = str[pos+1] & str[pos+2]
+#       pos.inc 2 #  skip hex chars
+#       if buf == "\c\l" or buf[0] == '\c': # forced newline
+#         discard # just eat it
+#       else:
+#         var num: char
+#         try:
+#           num = buf.parseHexInt.char
+#         except:
+#           echo "could not parse char:", buf , " at idx ", pos
+#         result.add convert($num, destEncoding, srcEncoding)
+#     else:
+#       result.add ch
+#     pos.inc
 
-
-when isMainModule and true:
+echo repeat("a", 100).quoted("iso-8859-1", newLineAt = 73)
+const testing = true
+when isMainModule and testing:
   assert unQuoted("=E4", "iso-8859-1") == "ä"
   assert unQuoted("=E4=E4", "iso-8859-1") == "ää"
   assert unQuoted("a=E4", "iso-8859-1") == "aä"
   
-when isMainModule and true:
+when isMainModule and testing:
+  assert quoted("=", "iso-8859-1") == "=3D"
   assert quoted("a", "iso-8859-1") == "a"
   assert quoted("ä", "iso-8859-1") == "=E4"
   assert quoted("ää", "iso-8859-1") == "=E4=E4"
@@ -75,32 +118,32 @@ when isMainModule and true:
   assert quoted("aä", "iso-8859-1") == "a=E4"
   assert quoted("\c\l", "iso-8859-1") == "=0D=0A"
 
-  let tst1 = """Hätten Hüte ein ß im Namen, wären sie möglicherweise keine Hüte mehr,
-  sondern Hüße."""
+  let tst1 = "Hätten Hüte ein ß im Namen, wären sie möglicherweise keine Hüte mehr,\nsondern Hüße."
   let tst1_quoted = tst1.quoted("iso-8859-1")
+  echo tst1_quoted
+  echo tst1_quoted.unQuoted("iso-8859-1")
   assert tst1_quoted.unQuoted("iso-8859-1") == tst1
 
   let tst2 = """Здравствуйте"""
   let tst2_quoted = tst2.quoted("koi8-r")
   assert tst2_quoted == "=FA=C4=D2=C1=D7=D3=D4=D7=D5=CA=D4=C5"
   assert tst2_quoted.unQuoted("koi8-r") == tst2
+  assert tst2_quoted.quoted("koi8-r").unQuoted("koi8-r").unQuoted("koi8-r") == tst2
   
+  assert "=E4=\c\l=E4".unQuoted("iso-8859-1") == "ää"
+  # echo "foo"
+  # assert repeat("a", 73).quoted("iso-8859-1")
 
 
-
-# """
-# Now's the time =
-#  for all folk to come=
-#  to the aid of their country."""
-# "Now's the time for all folk to come to the aid of their country."
-
-# import dbg
-
-# timeIt "foo":
-#   discard quoted("a", "iso-8859-1") == "a"
-
-# echo tst1_quoted.unQuoted("iso-8859-1") 
-# echo tst1.quoted("iso-8859-1")
-# let sol1 = """H=E4tten H=FCte ein =DF im Namen, w=E4ren sie m=F6glicherweise keine H=FCte=
-#  mehr, 
-# sondern H=FC=DFe."""
+# echo unQuoted("""foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=
+# =C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=
+# =A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4=
+# foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=
+# =C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=
+# =A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4=
+# foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=
+# =C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=
+# =A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4=
+# foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=
+# =C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=
+# =A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4""", "utf-8")
