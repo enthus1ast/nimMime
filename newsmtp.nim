@@ -114,16 +114,14 @@ proc createMessage*(mSubject, mBody: string, mTo,
 
 proc `$`*(msg: Message): string =
   ## stringify for ``Message``.
-  result = ""
-  var mimeHeaders = newMimeHeaders()
-  mimeHeaders["TO"] = msg.msgTo
-  mimeHeaders["CC"] = msg.msgCc
-  mimeHeaders["Subject"] = msg.msgSubject
+  var mimeMsg = newMimeMessage()
+  mimeMsg.header["TO"] = msg.msgTo.mimeList
+  mimeMsg.header["CC"] = msg.msgCc.mimeList
+  mimeMsg.header["Subject"] = msg.msgSubject
   for key, value in pairs(msg.msgOtherHeaders):
-    mimeHeaders[key] = value
-  result.addHeaders mimeHeaders
-  result.add("\c\L")
-  result.add(msg.msgBody)  
+    mimeMsg.header[key] = value
+  mimeMsg.body = msg.msgBody
+  return $mimeMsg
 
 
 proc newSmtp*(useSsl = false, debug=false,
@@ -217,7 +215,7 @@ proc close*(smtp: Smtp | AsyncSmtp) {.multisync.} =
   smtp.sock.close()
 
 when isMainModule:
-  echo createMessage("Hello from Nim's SMTP!",
+  echo $createMessage("Hello from Nim's SMTP!",
         "Hello!\nIs this awesome or what?", @["foo@example.org", "baa@example.org"])
 
 when not defined(testing) and isMainModule and true:
