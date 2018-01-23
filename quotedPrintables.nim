@@ -28,7 +28,7 @@
 import encodings, strutils
 
 # const MAIL_SAFE = Letters + Digits + {'\'', '(',')','+',',','-','.','/',':','=','?'}
-const MAIL_SAFE = Letters + Digits + {'\'', '(',')','+',',','-','.','/',':','?'}
+const MAIL_SAFE = Letters + Digits + {'\'', '(',')','+',',','-','.','/',':','?', ' '}
 
 template addCL() = 
   result.add "=\c\l"
@@ -42,16 +42,16 @@ proc quoted(str: string, destEncoding: string, srcEncoding = "utf-8", newlineAt 
   for ch in enc:
     case ch.char
     of MAIL_SAFE:
-      if lineChars >= newlineAt - 1: 
+      if lineChars >= newlineAt - 2: # ch + '='
         addCl
       result.add $ch
       lineChars.inc
     else: 
-      if lineChars >= newlineAt - 3: 
+      if lineChars >= newlineAt - 4: # =FF + '='
         addCl
       result.add "="
       result.add ch.ord().toHex(2)
-      lineChars.inc 3
+      lineChars.inc 3 # encoding look like "=ff"
 
 proc unQuoted(str: string, srcEncoding: string, destEncoding = "utf-8"): string =
   ## decodes into dest encoding from quoted printables
@@ -95,8 +95,8 @@ when isMainModule and testing:
 
   let tst1 = "Hätten Hüte ein ß im Namen, wären sie möglicherweise keine Hüte mehr,\nsondern Hüße."
   let tst1_quoted = tst1.quoted("iso-8859-1")
-  echo tst1_quoted
-  echo tst1_quoted.unQuoted("iso-8859-1")
+  # echo tst1_quoted
+  # echo tst1_quoted.unQuoted("iso-8859-1")
   assert tst1_quoted.unQuoted("iso-8859-1") == tst1
 
   let tst2 = """Здравствуйте"""
@@ -110,7 +110,7 @@ when isMainModule and testing:
   # assert repeat("a", 73).quoted("iso-8859-1")
 
 
-# echo unQuoted("""foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=
+# discard unQuoted("""foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=
 # =C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=
 # =A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4=
 # foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=
@@ -122,3 +122,11 @@ when isMainModule and testing:
 # foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=
 # =C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=
 # =A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4""", "utf-8")
+
+when isMainModule and testing:
+  # binary test
+  import os
+  let f = readFile(getAppFilename())
+  var s = f.quoted("utf-8")
+  assert s.unQuoted("utf-8") == f
+  echo s
