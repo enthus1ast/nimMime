@@ -110,19 +110,6 @@ when isMainModule and testing:
   # assert repeat("a", 73).quoted("iso-8859-1")
 
 
-# discard unQuoted("""foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=
-# =C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=
-# =A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4=
-# foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=
-# =C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=
-# =A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4=
-# foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=
-# =C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=
-# =A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4=
-# foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=
-# =C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=
-# =A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4foo=C3=A4""", "utf-8")
-
 when isMainModule and testing:
   # binary test
   import os
