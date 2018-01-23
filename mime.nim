@@ -66,20 +66,9 @@ proc newMimeMessage*(subtype="mixed"): MimeMessage =
   result.body = ""
   result.parts = @[]
   result.boundary = ""
-  # result = MimeMessage()
-  # result.version = ""
-  # result.header = newMimeHeaders()
-  # result.body = ""
-  # # result.parts = 
 
 proc newMimeMessageMultipart*(subtype="mixed"): MimeMessageMultipart = 
   return newMimeMessage(subtype)
-  # result = MimeMessageMultipart()
-  # result.version = ""
-  # result.header = newMimeHeaders()
-  # result.subtype = subtype
-  # result.body = ""
-  # result.parts = @[]
 
 proc `$`*(headers: MimeHeaders): string =
   return $headers.table
@@ -190,14 +179,6 @@ proc addHeaders*(msg: var string, headers: MimeHeaders) =
   for k, v in headers:
     msg.add(k & ": " & v & mimeNewline)  
 
-# proc `$`*(msg: MimeMessage): string =
-#   result = ""
-#   if msg.version.len > 0: 
-#     result.add msg.version & mimeNewline
-#   result.addHeaders(msg.header)
-#   result.add mimeNewline
-#   result.add msg.body
-
 proc `$`*(multi: MimeMessage | MimeMessageMultipart): string =
   ## returns the string representation of the multipart message
   result = ""
@@ -207,7 +188,6 @@ proc `$`*(multi: MimeMessage | MimeMessageMultipart): string =
   result.add mimeNewline
   result.add multi.body
   when multi.type is MimeMessageMultipart:
-    echo "MULTIPART"
     let boundaryLine = mimeNewline & "--" & multi.boundary & mimeNewline
     let boundaryLineLast = mimeNewline & "--" & multi.boundary & "--" & mimeNewline
     for idx, msg in multi.parts:
@@ -215,9 +195,6 @@ proc `$`*(multi: MimeMessage | MimeMessageMultipart): string =
       result.add $msg
       if idx == multi.parts.len-1:
         result.add boundaryLineLast # last boundary must be also suffixed by "--"
-  else:
-    echo "NO MULTIPART"
-
 
 proc isUniqueBoundary(msgs: seq[MimeMessage], boundary: string): bool =
   ## returns true if the given boundary is unique in the msgs
