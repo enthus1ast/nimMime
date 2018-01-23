@@ -7,30 +7,41 @@
 #    distribution, for details about the copyright.
 #
 
-## Contains basic MIME parser
+## Contains basic MIME parser/generator
 import tables, strutils, parseutils, random
 
 type
-  MimeMessage* = object
-    version*: string
-    header*: MimeHeaders
-    body*: string
-  MimeMessageMultipart* = object
+  # MimeMessage* = object
+  #   version*: string
+  #   header*: MimeHeaders
+  #   body*: string
+  # MimeMessageMultipart* = object 
+  #   version*: string
+  #   header*: MimeHeaders
+  #   subtype*: string # like Mixed,Alternative,Digest etc
+  #   boundary: string
+  #   body*: seq[MimeMessage]    
+  #   # parts*: seq[MimeMessage]
+  MimeMessage* = ref object
+    # version*: string
+    # header*: MimeHeaders
+    # body*: string
+  # MimeMessageMultipart* = object 
     version*: string
     header*: MimeHeaders
     subtype*: string # like Mixed,Alternative,Digest etc
     boundary: string
-    body*: seq[MimeMessage]    
+    body*: string    
+    parts*: seq[MimeMessage]  
+  MimeMessageMultipart = MimeMessage
   MimeHeaders* = ref object
     # table*: TableRef[string, seq[string]]
     table*: OrderedTableRef[string, seq[string]]
-
   MimeHeaderValues* = distinct seq[string]
 
 const 
   headerLimit* = 10_000
   mimeNewline* = "\c\L"
-
 
 proc mimeList*(elems: seq[string]): string =
   return elems.join(", ")
@@ -47,18 +58,28 @@ proc newMimeHeaders*(keyValuePairs:
   new result
   result.table = newOrderedTable[string, seq[string]](pairs)
 
-proc newMimeMessage*(): MimeMessage = 
-  result = MimeMessage()
-  result.version = ""
-  result.header = newMimeHeaders()
-  result.body = ""
-
-proc newMimeMessageMultipart*(subtype="mixed"): MimeMessageMultipart = 
+proc newMimeMessage*(subtype="mixed"): MimeMessage = 
   result = MimeMessageMultipart()
   result.version = ""
   result.header = newMimeHeaders()
   result.subtype = subtype
-  result.body = @[]
+  result.body = ""
+  result.parts = @[]
+  result.boundary = ""
+  # result = MimeMessage()
+  # result.version = ""
+  # result.header = newMimeHeaders()
+  # result.body = ""
+  # # result.parts = 
+
+proc newMimeMessageMultipart*(subtype="mixed"): MimeMessageMultipart = 
+  return newMimeMessage(subtype)
+  # result = MimeMessageMultipart()
+  # result.version = ""
+  # result.header = newMimeHeaders()
+  # result.subtype = subtype
+  # result.body = ""
+  # result.parts = @[]
 
 proc `$`*(headers: MimeHeaders): string =
   return $headers.table
@@ -165,51 +186,70 @@ proc addHeaders*(msg: var string, headers: MimeHeaders) =
   ## From asynchttp
   if headers.len == 0:
     msg.add mimeNewline
-    return
+    return # if no header present we still need newline!
   for k, v in headers:
     msg.add(k & ": " & v & mimeNewline)  
 
-proc isUniqueBoundary(msgs: seq[MimeMessage], boundary: string): bool =
-  for msg in msgs:
-    if boundary in $msg:
-      return false
-  return true
+# proc `$`*(msg: MimeMessage): string =
+#   result = ""
+#   if msg.version.len > 0: 
+#     result.add msg.version & mimeNewline
+#   result.addHeaders(msg.header)
+#   result.add mimeNewline
+#   result.add msg.body
 
-proc uniqueBoundary*(multi: MimeMessageMultipart): string =
-  ## returns a message wide unique string to use as a boundary
-  while true:
-    result = $rand(1_000..int.high)
-    if multi.body.isUniqueBoundary(result): 
-      break
-
-proc `$`*(msg: MimeMessage): string =
-  result = ""
-  if msg.version.len > 0: 
-    result.add msg.version & mimeNewline
-  result.addHeaders(msg.header)
-  result.add mimeNewline
-  result.add msg.body
-
-proc `$`*(multi: MimeMessageMultipart): string =
+proc `$`*(multi: MimeMessage | MimeMessageMultipart): string =
   ## returns the string representation of the multipart message
   result = ""
   if multi.version.len > 0: 
     result.add multi.version & mimeNewline
   result.addHeaders(multi.header)
   result.add mimeNewline
-  let boundaryLine = mimeNewline & "--" & multi.boundary & mimeNewline
-  let boundaryLineLast = mimeNewline & "--" & multi.boundary & "--" & mimeNewline
-  for idx, msg in multi.body:
-    result.add boundaryLine
-    result.add $msg
-    if idx == multi.body.len-1:
-      result.add boundaryLineLast # last boundary must be also suffixed by "--"
-      
+  result.add multi.body
+  when multi.type is MimeMessageMultipart:
+    echo "MULTIPART"
+    let boundaryLine = mimeNewline & "--" & multi.boundary & mimeNewline
+    let boundaryLineLast = mimeNewline & "--" & multi.boundary & "--" & mimeNewline
+    for idx, msg in multi.parts:
+      result.add boundaryLine
+      result.add $msg
+      if idx == multi.parts.len-1:
+        result.add boundaryLineLast # last boundary must be also suffixed by "--"
+  else:
+    echo "NO MULTIPART"
+
+
+proc isUniqueBoundary(msgs: seq[MimeMessage], boundary: string): bool =
+  ## returns true if the given boundary is unique in the msgs
+  for msg in msgs:
+    if boundary in $msg:
+      return false
+  return true
+
+proc uniqueBoundary*(multi: MimeMessageMultipart): string =
+  ## returns a message wide unique string to use as a multipart boundary
+  while true:
+    result = $rand(1_000..int.high)
+    if multi.parts.isUniqueBoundary(result): 
+      break
 
 proc finalize*(multi: var MimeMessageMultipart) = 
   ## Computes and sets a unique boundary
   multi.boundary = multi.uniqueBoundary()
   multi.header["Content-Type"] = """multipart/$#; boundary="$#"""" % @[multi.subtype, multi.boundary]
+
+# import encoding
+# proc needsEncoding*(str: string): bool = 
+#   ## If the str is not US-ASCII (or not mailsafe!) it needs to be encoded.
+#   try:
+#     convert()
+
+proc newAttachment*(content, filename: string): MimeMessage = 
+  ## 
+  ## TODO encode if not US-ASCII
+  result = newMimeMessage()
+  result.header["Content-Disposition"] = """attachment; filename="$#"""" % @[filename]
+  result.body = content
 
 # let t1 = """MIME-Version: 1.0
 #  Content-Type: multipart/mixed; boundary=frontier
@@ -254,7 +294,7 @@ when isMainModule and true:
   msg.add "body content"
   # echo msg
 
-when isMainModule and true: # multipart test
+when isMainModule and false: # multipart test
   var multi = newMimeMessageMultipart()
   multi.header["to"] = @["foo@nim.org", "baa@nim.org"].mimeList
   multi.header["subject"] = "multiparted US-ASCII for you"
@@ -262,24 +302,40 @@ when isMainModule and true: # multipart test
   var first = newMimeMessage()
   first.header["content-type"] = "text/plain"
   first.body = "i show up in email readers! i do not end with a linebreak!"
-  multi.body.add first
+  multi.parts.add first
 
   var second = newMimeMessage()
   second.header["content-type"] = "text/plain"
   second.body = "i am another multipart 42924863215779480875955470471231252136"
-  multi.body.add second
+  multi.parts.add second
 
   var third = newMimeMessage()
   third.header["content-type"] = "text/plain"
   third.header["Content-Disposition"] = """attachment; filename="test.txt""""
-  third.body = "i am a manually attached AND i end with a explicit line break\n"
-  multi.body.add third  
+  third.body = "i am manually attached AND i end with a explicit line break\n"
+  multi.parts.add third  
+
+  multi.parts.add newAttachment("i am the filecontent", "filename.txt")
   # echo "==="
   # multi.boundary = multi.uniqueBoundary()
   multi.finalize()
   echo $multi
 
-
+when isMainModule and true: # multipart in multipart
+  var multi1 = newMimeMessageMultipart()
+  
+  var multi2 = newMimeMessageMultipart()
+  multi2.header["foo"] = "in multi2"
+  
+  var normal = newMimeMessage()
+  normal.body = "in normal"
+  # echo repr normal.type
+  
+  multi1.parts.add multi2
+  multi1.parts.add normal
+  # echo "lol"
+  multi1.finalize()
+  echo $multi1
 
   # var msg = ""
   # test.add("Connection", "Test")

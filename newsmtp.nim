@@ -234,8 +234,39 @@ when not defined(testing) and isMainModule and true:
 
   let
     conf = loadConfig("smtp.ini")
-    msg = createMessage("Hello from Nim's SMTP!",
-      "Hello!\n Is this awesome or what?", conf["recipient"].split(",") )
+    # msg = createMessage("Hello from Nim's SMTP!",
+    #   "Hello!\n Is this awesome or what?", conf["recipient"].split(",") )
+  
+  ####################################################################################
+  # New example
+  ####################################################################################
+  var multi = newMimeMessageMultipart()
+  multi.header["to"] = @["foo@nim.org", "baa@nim.org"].mimeList
+  multi.header["subject"] = "FLORBISCH multiparted US-ASCII for you"
+  
+  var first = newMimeMessage()
+  first.header["content-type"] = "text/plain"
+  first.body = "i show up in email readers! i do not end with a linebreak!"
+  multi.parts.add first
+
+  var second = newMimeMessage()
+  second.header["content-type"] = "text/plain"
+  second.header["Content-Disposition"] = """attachment; filename="second.txt""""
+  second.body = "i am another multipart 42924863215779480875955470471231252136"
+  multi.parts.add second
+
+  var third = newMimeMessage()
+  third.header["content-type"] = "text/plain"
+  third.header["Content-Disposition"] = """attachment; filename="third.txt""""
+  third.body = "i am a manually attached AND i end with a explicit line break\n"
+  multi.parts.add third  
+  # echo "==="
+  # multi.boundary = multi.uniqueBoundary()
+  multi.finalize()
+  let msg = $multi
+  ####################################################################################
+
+
 
   assert conf["smtphost"] != ""
 
@@ -246,7 +277,7 @@ when not defined(testing) and isMainModule and true:
     )
     await client.connect(conf["smtphost"], conf["port"].parseInt.Port)
     await client.auth(conf["username"], conf["password"])
-    await client.sendMail(conf["sender"], conf["recipient"].split(","), $msg)
+    await client.sendMail(conf["sender"], conf["recipient"].split(","), msg)
     await client.close()
     echo "async email sent"
 
