@@ -11,22 +11,7 @@
 import tables, strutils, parseutils, random
 
 type
-  # MimeMessage* = object
-  #   version*: string
-  #   header*: MimeHeaders
-  #   body*: string
-  # MimeMessageMultipart* = object 
-  #   version*: string
-  #   header*: MimeHeaders
-  #   subtype*: string # like Mixed,Alternative,Digest etc
-  #   boundary: string
-  #   body*: seq[MimeMessage]    
-  #   # parts*: seq[MimeMessage]
   MimeMessage* = ref object
-    # version*: string
-    # header*: MimeHeaders
-    # body*: string
-  # MimeMessageMultipart* = object 
     version*: string
     header*: MimeHeaders
     subtype*: string # like Mixed,Alternative,Digest etc
@@ -35,13 +20,13 @@ type
     parts*: seq[MimeMessage]  
   MimeMessageMultipart = MimeMessage
   MimeHeaders* = ref object
-    # table*: TableRef[string, seq[string]]
     table*: OrderedTableRef[string, seq[string]]
   MimeHeaderValues* = distinct seq[string]
 
 const 
   headerLimit* = 10_000
   mimeNewline* = "\c\L"
+  sep = "--"
 
 proc mimeList*(elems: seq[string]): string =
   return elems.join(", ")
@@ -188,8 +173,8 @@ proc `$`*(multi: MimeMessage | MimeMessageMultipart): string =
   result.add mimeNewline
   result.add multi.body
   when multi.type is MimeMessageMultipart:
-    let boundaryLine = mimeNewline & "--" & multi.boundary & mimeNewline
-    let boundaryLineLast = mimeNewline & "--" & multi.boundary & "--" & mimeNewline
+    let boundaryLine = mimeNewline & sep & multi.boundary & mimeNewline
+    let boundaryLineLast = mimeNewline & sep & multi.boundary & sep & mimeNewline
     for idx, msg in multi.parts:
       result.add boundaryLine
       result.add $msg
@@ -298,7 +283,7 @@ when isMainModule and false: # multipart test
   multi.finalize()
   echo $multi
 
-when isMainModule and true: # multipart in multipart
+when isMainModule and false: # multipart in multipart
   var multi1 = newMimeMessageMultipart()
   
   var multi2 = newMimeMessageMultipart()
