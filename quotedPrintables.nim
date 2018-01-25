@@ -28,13 +28,13 @@
 import encodings, strutils
 
 # const MAIL_SAFE = Letters + Digits + {'\'', '(',')','+',',','-','.','/',':','=','?'}
-const MAIL_SAFE = Letters + Digits + {'\'', '(',')','+',',','-','.','/',':', ' '}
+const MAIL_SAFE* = Letters + Digits + {'\'', '(',')','+',',','-','.','/',':', ' ', '!'}
 
 template addCL() = 
   result.add "=\c\l"
   lineChars = 0  
 
-proc quoted(str: string, destEncoding: string, srcEncoding = "utf-8", newlineAt = 76): string =
+proc quoted*(str: string, destEncoding: string, srcEncoding = "utf-8", newlineAt = 76): string =
   ## encodes into Quoted Printables encoding 
   result = ""
   var lineChars = 0
@@ -53,7 +53,7 @@ proc quoted(str: string, destEncoding: string, srcEncoding = "utf-8", newlineAt 
       result.add ch.ord().toHex(2)
       lineChars.inc 3 # encoding look like "=ff"
 
-proc unQuoted(str: string, srcEncoding: string, destEncoding = "utf-8"): string =
+proc unQuoted*(str: string, srcEncoding: string, destEncoding = "utf-8"): string =
   ## decodes into dest encoding from quoted printables
   result = ""
   var 

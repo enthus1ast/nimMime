@@ -11,9 +11,15 @@
 import tables, strutils, parseutils, random
 
 type
+  ContentTransferEncoders = enum 
+    BASE64 = "BASE64"
+    QUOTED_PRINTABLES = "QUOTED-PRINTABLE"
   MimeMessage* = ref object
     version*: string
     header*: MimeHeaders
+    charset*: string # like utf-8, iso-8859-1, koi8-r
+    contentType*: string # like text
+    contentTransferEncoding: ContentTransferEncoders
     subtype*: string # like Mixed,Alternative,Digest etc
     boundary: string
     body*: string    
@@ -22,6 +28,10 @@ type
   MimeHeaders* = ref object
     table*: OrderedTableRef[string, seq[string]]
   MimeHeaderValues* = distinct seq[string]
+  MimeEncoding* = enum
+    noEncoding
+    base64Encoding
+    quotedPrintablesEncoding
 
 const 
   headerLimit* = 10_000
@@ -43,17 +53,18 @@ proc newMimeHeaders*(keyValuePairs:
   new result
   result.table = newOrderedTable[string, seq[string]](pairs)
 
-proc newMimeMessage*(subtype="mixed"): MimeMessage = 
+proc newMimeMessage*(contentType = "text", subtype="plain"): MimeMessage = 
   result = MimeMessageMultipart()
   result.version = ""
   result.header = newMimeHeaders()
+  result.contentType = contentType
   result.subtype = subtype
   result.body = ""
   result.parts = @[]
   result.boundary = ""
 
-proc newMimeMessageMultipart*(subtype="mixed"): MimeMessageMultipart = 
-  return newMimeMessage(subtype)
+proc newMimeMessageMultipart*(contentType = "multipart", subtype="mixed"): MimeMessageMultipart = 
+  return newMimeMessage(contentType, subtype)
 
 proc `$`*(headers: MimeHeaders): string =
   return $headers.table
@@ -196,15 +207,69 @@ proc uniqueBoundary*(multi: MimeMessageMultipart): string =
       break
 
 proc finalize*(multi: var MimeMessageMultipart) = 
-  ## Computes and sets a unique boundary
+  ## Computes and sets a unique multipart boundary, 
+  ## after this call the multipart message is ready
+  ## to serialize with `$`.
   multi.boundary = multi.uniqueBoundary()
   multi.header["Content-Type"] = """multipart/$#; boundary="$#"""" % @[multi.subtype, multi.boundary]
 
-# import encoding
-# proc needsEncoding*(str: string): bool = 
-#   ## If the str is not US-ASCII (or not mailsafe!) it needs to be encoded.
-#   try:
-#     convert()
+import encodings, quotedPrintables, base64
+proc encodeQuotedPrintables*(msg: var MimeMessage, srcEncoding = "utf-8") =
+  ## TODO should this maybe return a new message?
+  ## TODO better handling on header params/already encoded messages.
+  ## sets transfer encoding header and encodes the message body.
+  #  Content-Type: text/plain; charset=ISO-8859-1 
+  #  Content-transfer-encoding: base64
+  # if msg.header; charset=ISO-8859-1
+  # msg.header["content-type"] &= " ; charset=$#" % [srcEncoding]
+  # msg.header["Content-transfer-encoding"] = "QUOTED-PRINTABLE"
+  msg.charset = srcEncoding
+  msg.contentTransferEncoding = QUOTED_PRINTABLES
+  msg.body = msg.body.quoted(srcEncoding)
+
+proc encodeBase64*(msg: var MimeMessage, srcEncoding = "utf-8") =
+  ## TODO should this maybe return a new message?
+  ## TODO better handling on header params/already encoded messages.
+  ## sets transfer encoding header and encodes the message body.
+  #  Content-Type: text/plain; charset=ISO-8859-1 
+  #  Content-transfer-encoding: base64
+  # if msg.header; charset=ISO-8859-1
+  # msg.header["content-type"] &= " ; charset=$#" % [srcEncoding]
+  # msg.header["Content-transfer-encoding"] = "QUOTED-PRINTABLE"
+  msg.charset = srcEncoding
+  msg.contentTransferEncoding = BASE64
+  msg.body = msg.body.encode()
+
+proc needsEncoding*(str: string): bool = 
+  for ch in str:
+    if ch notin MAIL_SAFE:
+      return true
+  return false
+
+proc needsEncoding*(msg: MimeMessage | MimeMessageMultipart): bool =
+  ## checks if the given message needs encoding
+  # TODO also check the headers or not?
+  if msg.body.needsEncoding: return true
+  for key, val in msg.header.pairs:
+    if val.needsEncoding: return true
+  when msg.type is MimeMessageMultipart:
+    for part in msg.parts:
+      if part.needsEncoding: return true
+  return false
+
+# proc needsEncoding*(multi: MimeMessageMultipart): bool =
+#   if msg.needsEncoding: return true
+
+  ## If the str is not US-ASCII (or not mailsafe!) it needs to be encoded.
+
+  # try:
+    # echo convert(str, "us-ascii", getCurrentEncoding())
+    
+  #   result = false
+  #   discard
+  # except:
+  #   echo getCurrentExceptionMsg()
+  #   result = true
 
 proc newAttachment*(content, filename: string): MimeMessage = 
   ## 
@@ -256,30 +321,38 @@ when isMainModule and true:
   msg.add "body content"
   # echo msg
 
-when isMainModule and false: # multipart test
+when isMainModule and true: # multipart test
   var multi = newMimeMessageMultipart()
+  multi.body = "In multipart messages the body is just a comment for incompatible clients"
   multi.header["to"] = @["foo@nim.org", "baa@nim.org"].mimeList
   multi.header["subject"] = "multiparted US-ASCII for you"
   
   var first = newMimeMessage()
   first.header["content-type"] = "text/plain"
   first.body = "i show up in email readers! i do not end with a linebreak!"
+  assert first.needsEncoding() == false
   multi.parts.add first
 
   var second = newMimeMessage()
   second.header["content-type"] = "text/plain"
   second.body = "i am another multipart 42924863215779480875955470471231252136"
+  assert second.needsEncoding() == false
   multi.parts.add second
 
   var third = newMimeMessage()
   third.header["content-type"] = "text/plain"
   third.header["Content-Disposition"] = """attachment; filename="test.txt""""
-  third.body = "i am manually attached AND i end with a explicit line break\n"
+  third.body = "i am manually attached öäü AND i end with a explicit line break\n"
+  if third.needsEncoding():
+    third.encodeQuotedPrintables()
   multi.parts.add third  
 
-  multi.parts.add newAttachment("i am the filecontent", "filename.txt")
+  var attachment = newAttachment("i am the filecontent", "filename.txt")
+  attachment.encodeBase64() 
+  multi.parts.add attachment
   # echo "==="
   # multi.boundary = multi.uniqueBoundary()
+  # assert multi.needsEncoding() == false
   multi.finalize()
   echo $multi
 
@@ -298,6 +371,12 @@ when isMainModule and false: # multipart in multipart
   # echo "lol"
   multi1.finalize()
   echo $multi1
+
+when isMainModule and true:
+  assert "foo".needsEncoding() == false
+  assert "föö".needsEncoding() == true
+  # echo "föö".needsEncoding()
+
 
   # var msg = ""
   # test.add("Connection", "Test")
