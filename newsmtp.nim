@@ -240,7 +240,7 @@ when not defined(testing) and isMainModule and true:
   ####################################################################################
   # New example
   ####################################################################################
-  var multi = newMimeMessageMultipart()
+  var multi = newMimeMessage()
   multi.header["to"] = @["foo@nim.org", "baa@nim.org"].mimeList
   multi.header["subject"] = "FLORBISCH multiparted US-ASCII for you"
   
