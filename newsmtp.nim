@@ -240,28 +240,29 @@ when not defined(testing) and isMainModule and true:
   ####################################################################################
   # New example
   ####################################################################################
-  var multi = newMimeMessage()
+  import os
+  var multi = newMimeMessage(subtype="mixed")
   multi.header["to"] = @["foo@nim.org", "baa@nim.org"].mimeList
-  multi.header["subject"] = "FLORBISCH multiparted US-ASCII for you"
+  multi.header["subject"] = "j multiparted US-ASCII for you"
   
   var first = newMimeMessage()
-  first.header["content-type"] = "text/plain"
   first.body = "i show up in email readers! i do not end with a linebreak!"
   multi.parts.add first
 
-  var second = newMimeMessage()
-  second.header["content-type"] = "text/plain"
-  second.header["Content-Disposition"] = """attachment; filename="second.txt""""
-  second.body = "i am another multipart 42924863215779480875955470471231252136"
+  var second = newAttachment("i am a file", filename = "second.txt")
   multi.parts.add second
 
   var third = newMimeMessage()
-  third.header["content-type"] = "text/plain"
   third.header["Content-Disposition"] = """attachment; filename="third.txt""""
   third.body = "i am a manually attached AND i end with a explicit line break\n"
   multi.parts.add third  
   # echo "==="
   # multi.boundary = multi.uniqueBoundary()
+
+  var image = newAttachment(readFile("./tests/logo.png"), filename = "logo.png")
+  image.encodeBase64()
+  multi.parts.add(image)
+
   multi.finalize()
   let msg = $multi
   ####################################################################################

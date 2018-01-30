@@ -229,7 +229,9 @@ proc finalize*(msg: var MimeMessage) =
   var contentType = ""
   if msg.isMultipart:
     msg.boundary = msg.uniqueBoundary()
-    contentType = """$#/$#; boundary="$#"""" % @[msg.contentType, msg.subtype, msg.boundary]
+    contentType = """multipart/mixed; boundary="$#"""" % @[msg.boundary]
+    # contentType = """multipart/$#; boundary="$#"""" % @[msg.subtype, msg.boundary]
+    # contentType = """multipart; boundary="$#"""" % @[msg.boundary] # TODO
   else:
     contentType = """$#/$#""" % @[msg.contentType, msg.subtype]
   
