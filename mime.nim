@@ -9,6 +9,11 @@
 
 ## Contains basic MIME parser/generator
 import tables, strutils, parseutils, random
+import encodings, quotedPrintables, base64
+import mimetypes
+## TODOS:
+## [] add line/header encoding
+## [] 
 
 type
   ContentTransferEncoders = enum 
@@ -20,29 +25,38 @@ type
     header*: MimeHeaders
     charset*: string # like utf-8, iso-8859-1, koi8-r
     contentType*: string # like text
+    subtype*: string # like Mixed,Alternative ,Digest/plain etc    
     contentTransferEncoding: ContentTransferEncoders
-    subtype*: string # like Mixed,Alternative,Digest etc
     boundary*: string
     body*: string    
     parts*: seq[MimeMessage] # fill this for multipart.
-  # MimeMessageMultipart* = ref object of MimeMessage
-    # parts*: seq[MimeMessage | MimeMessageMultipart]  
-  # MimeMessageMultipart* = distinct MimeMessage 
   MimeHeaders* = ref object
     table*: OrderedTableRef[string, seq[string]]
   MimeHeaderValues* = distinct seq[string]
-  MimeEncoding* = enum
-    noEncoding
-    base64Encoding
-    quotedPrintablesEncoding
 
 const 
   headerLimit* = 10_000
   mimeNewline* = "\c\L"
   sep = "--"
+  CONTENT_TRANSFER_ENCODING = "Content-Transfer-Encoding"
+  CONTENT_DISPOSITION = "Content-Disposition"
+  CONTENT_TYPE = "Content-Type"
 
 proc mimeList*(elems: seq[string]): string =
   return elems.join(", ")
+
+
+
+
+## 
+# proc mimeTable*(table: OrderedTable[string,string]): string = 
+#   result = ""
+#   for key, val in table.pairs:
+#     result.add key #"$#=$#" % @[key,val]
+#     if val.len != 0:
+#       result.add '='
+#       result.add val
+
 
 proc newMimeHeaders*(): MimeHeaders =
   new result
@@ -56,9 +70,6 @@ proc newMimeHeaders*(keyValuePairs:
   new result
   result.table = newOrderedTable[string, seq[string]](pairs)
 
-# proc init(msg: MimeMessage, contentType, subtype,  charset: string) =
-
-
 proc newMimeMessage*(contentType = "text", subtype="plain", charset = "UTF-8"): MimeMessage = 
   result = MimeMessage()
   result.version = ""
@@ -69,10 +80,6 @@ proc newMimeMessage*(contentType = "text", subtype="plain", charset = "UTF-8"): 
   result.body = ""
   result.boundary = ""
   result.parts = @[]
-# proc newMimeMessageMultipart*(contentType = "multipart", subtype="mixed", charset = "UTF-8"): MimeMessageMultipart = 
-  # result = MimeMessageMultipart()
-  # result.init(contentType, subtype,  charset)
-  # result.parts = @[]
 
 proc `$`*(headers: MimeHeaders): string =
   return $headers.table
@@ -187,14 +194,13 @@ proc isMultipart*(msg: MimeMessage): bool =
   return msg.parts.len != 0
 
 proc `$`*(msg: MimeMessage): string =
-  ## returns the string representation of the msgpart message
+  ## returns the string representation of the MimeMessage
   result = ""
   if msg.version.len > 0: 
     result.add msg.version & mimeNewline
   result.addHeaders(msg.header)
   result.add mimeNewline
   result.add msg.body
-  # when msg.type is MimeMessage:
   if msg.isMultipart:
     let boundaryLine = mimeNewline & sep & msg.boundary & mimeNewline
     let boundaryLineLast = mimeNewline & sep & msg.boundary & sep & mimeNewline
@@ -218,46 +224,50 @@ proc uniqueBoundary*(multi: MimeMessage): string =
     if multi.parts.isUniqueBoundary(result): 
       break
 
-
-# proc finalize*(msg: var MimeMessage) =
-  # msg.
-
 proc finalize*(msg: var MimeMessage) = 
   ## Computes and sets a unique multipart boundary, 
   ## after this call the multipart message is ready
   ## to serialize with `$`.
-  var contentType = ""
-  if msg.isMultipart:
-    msg.boundary = msg.uniqueBoundary()
-    contentType = """multipart/mixed; boundary="$#"""" % @[msg.boundary]
-    # contentType = """multipart/$#; boundary="$#"""" % @[msg.subtype, msg.boundary]
-    # contentType = """multipart; boundary="$#"""" % @[msg.boundary] # TODO
-  else:
-    contentType = """$#/$#""" % @[msg.contentType, msg.subtype]
+  if not msg.header.hasKey(CONTENT_TYPE):
+    var contentType = ""
+    if msg.isMultipart:
+      msg.boundary = msg.uniqueBoundary()
+      contentType = """multipart/mixed; boundary="$#"""" % @[msg.boundary]
+      # contentType = """multipart/$#; boundary="$#"""" % @[msg.subtype, msg.boundary]
+      # contentType = """multipart; boundary="$#"""" % @[msg.boundary] # TODO
+    else:
+      contentType = """$#/$#""" % @[msg.contentType, msg.subtype]
+    if msg.charset != "":
+      contentType.add "; charset=$#" % @[msg.charset] 
+    msg.header[CONTENT_TYPE] = contentType
   
-  if msg.charset != "":
-    contentType.add "; charset=$#" % @[msg.charset] 
+  if not msg.header.hasKey(CONTENT_TRANSFER_ENCODING):
+    if msg.contentTransferEncoding != NO_ENCODING:
+      msg.header[CONTENT_TRANSFER_ENCODING] = $msg.contentTransferEncoding
   
-  msg.header["Content-Type"] = contentType
-  if msg.contentTransferEncoding != NO_ENCODING:
-    msg.header["Content-Transfer-Encoding"] = $msg.contentTransferEncoding
-
   if msg.isMultipart:
     for idx, part in msg.parts.mpairs:
       part.finalize()
 
+proc mimeEncoder*(txt: string, encoder: ContentTransferEncoders, 
+    line: bool, srcEncoding = "utf-8" ): string = 
+  var txtbuf = ""
+  case encoder
+  of NO_ENCODING: return txt
+  of QUOTED_PRINTABLES: txtbuf = txt.quoted(srcEncoding)
+  of BASE64: txtbuf = txt.encode()
+  if line: 
+    let shortname = ($encoder)[0] # since 'Q' / 'B' 
+    return "=?$#?$#?$#?=" % @[srcEncoding, $shortname, txtbuf]
+  return txtbuf
+    
 
-
-import encodings, quotedPrintables, base64
 proc encodeQuotedPrintables*(msg: var MimeMessage, srcEncoding = "utf-8") =
   ## TODO should this maybe return a new message?
   ## TODO better handling on header params/already encoded messages.
   ## sets transfer encoding header and encodes the message body.
   #  Content-Type: text/plain; charset=ISO-8859-1 
   #  Content-transfer-encoding: base64
-  # if msg.header; charset=ISO-8859-1
-  # msg.header["content-type"] &= " ; charset=$#" % [srcEncoding]
-  # msg.header["Content-transfer-encoding"] = "QUOTED-PRINTABLE"
   msg.charset = srcEncoding
   msg.contentTransferEncoding = QUOTED_PRINTABLES
   msg.body = msg.body.quoted(srcEncoding)
@@ -268,9 +278,6 @@ proc encodeBase64*(msg: var MimeMessage, srcEncoding = "utf-8") =
   ## sets transfer encoding header and encodes the message body.
   #  Content-Type: text/plain; charset=ISO-8859-1 
   #  Content-transfer-encoding: base64
-  # if msg.header; charset=ISO-8859-1
-  # msg.header["content-type"] &= " ; charset=$#" % [srcEncoding]
-  # msg.header["Content-transfer-encoding"] = "QUOTED-PRINTABLE"
   msg.charset = srcEncoding
   msg.contentTransferEncoding = BASE64
   msg.body = msg.body.encode()
@@ -305,13 +312,19 @@ proc needsEncoding*(msg: MimeMessage): bool =
   # except:
   #   echo getCurrentExceptionMsg()
   #   result = true
-
+import ospaths
 proc newAttachment*(content, filename: string, encoder = BASE64): MimeMessage = 
   ## 
   ## TODO encode if not US-ASCII
+  var m = newMimetypes()
+  var mimetype = m.getMimetype(splitFile(filename).ext)
   result = newMimeMessage()
-  result.header["Content-Disposition"] = """attachment; filename="$#"""" % @[filename]
+  result.header[CONTENT_DISPOSITION] = """attachment; filename="$#"""" % @[filename]
+  result.header[CONTENT_TYPE] = """$#; name="$#"""" % @[mimetype, filename]
+  # Content-Type: image/png; name="canvas2.png"
   result.body = content
+  
+
 
 # let t1 = """MIME-Version: 1.0
 #  Content-Type: multipart/mixed; boundary=frontier
@@ -363,35 +376,33 @@ when isMainModule and false: # multipart test
   multi.header["subject"] = "multiparted US-ASCII for you"
   
   var first = newMimeMessage()
-  first.header["content-type"] = "text/plain"
+  first.header[CONTENT_TYPE] = "text/plain"
   first.body = "i show up in email readers! i do not end with a linebreak!"
   assert first.needsEncoding() == false
   multi.parts.add first
 
   var second = newMimeMessage()
-  second.header["content-type"] = "text/plain"
+  second.header[CONTENT_TYPE] = "text/plain"
   second.body = "i am another multipart 42924863215779480875955470471231252136"
   assert second.needsEncoding() == false
   multi.parts.add second
 
   var third = newMimeMessage()
-  third.header["content-type"] = "text/plain"
+  third.header[CONTENT_TYPE] = "text/plain"
   third.header["Content-Disposition"] = """attachment; filename="test.txt""""
   third.body = "i am manually attached öäü AND i end with a explicit line break\n"
   if third.needsEncoding():
     third.encodeQuotedPrintables()
   multi.parts.add third  
 
-  var attachment = newAttachment("i am the filecontent", "filename.txt")
+  var attachment = newAttachment("i am the filecontent", "filename.png")
   attachment.encodeBase64() 
   multi.parts.add attachment
-  # echo "==="
-  # multi.boundary = multi.uniqueBoundary()
   # assert multi.needsEncoding() == false
   multi.finalize()
   echo $multi
 
-when isMainModule and true: # multipart in multipart
+when isMainModule and false: # multipart in multipart
   var multi = newMimeMessage()
   multi.header["foo"] = "in multi 1"
   multi.body = "in multi 1"
@@ -401,35 +412,53 @@ when isMainModule and true: # multipart in multipart
   multi2.body = "in multi 2"
   
   var normal = newMimeMessage()
-  normal.header["foo"] = "in normal"
+  normal.header["foo"] = "in normal--4292486321577948087--"
   normal.body = "in normal"
-  # echo repr normal.type
   multi2.parts.add normal
   multi.parts.add multi2
   multi.parts.add normal
-  # echo "lol"
+  multi.encodeQuotedPrintables
   multi.finalize()
   echo $multi
 
 when isMainModule and true:
   assert "foo".needsEncoding() == false
   assert "föö".needsEncoding() == true
-  # echo "föö".needsEncoding()
 
-
-  # var msg = ""
-  # test.add("Connection", "Test")
-  # msg.addHeaders(test)
-  # msg.add(mimeNewline)
-  # msg.add "body content"
-  # echo msg
+  var lst = newSeq[string]()
+  discard parseList(@["foo","baa"].mimeList(), lst, 0) 
+  assert lst == @["foo","baa"]
 
 
 # when isMainModule and true:
-#   test = newMimeHeaders()
-#   var msg = ""
-#   test.add("Connection", "Test")
-#   msg.addHeaders(test)
-#   msg.add(mimeNewline)
-#   msg.add "body content"
-#   echo msg  
+#   var mail = newMimeMessage()
+#   for foo in @["hans", "peter"]:
+#     mail.header["to"] = foo & "@example.org"
+#     mail.body = "Dear $#" % @[foo]
+#     if foo == "hans":
+#       var forhans = newAttachment("HI HANS!", "readme.png")
+#       mail.parts.add forhans
+#     mail.finalize()
+#     echo $mail
+#     echo "===================================================="
+
+
+when isMainModule and true:
+  for foo in @["hans", "peter"]:
+    var mail = newMimeMessage()
+    mail.header["to"] = foo & "@example.org"
+    mail.header["subject"] = mimeEncoder("Some umlaute öäü", QUOTED_PRINTABLES, true)
+    mail.body = "Dear $#" % @[foo]
+    if foo == "hans":
+      var forhans = newAttachment("HI HANS!", "readme.png")
+      mail.parts.add forhans
+    mail.finalize()
+    echo $mail
+    echo "===================================================="
+
+# proc encoderImpl(txt: string, encoder: ContentTransferEncoders, 
+#     line: bool, srcEncoding = "utf-8" ): string = 
+
+# when isMainModule and true:
+  ## Parser tests
+  # let t1 = ""

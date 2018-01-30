@@ -243,7 +243,8 @@ when not defined(testing) and isMainModule and true:
   import os
   var multi = newMimeMessage(subtype="mixed")
   multi.header["to"] = @["foo@nim.org", "baa@nim.org"].mimeList
-  multi.header["subject"] = "j multiparted US-ASCII for you"
+  multi.header["subject"] = "nnn multiparted US-ASCII for you"
+  multi.body = "In multipart messages the body is just a comment for incompatible clients"
   
   var first = newMimeMessage()
   first.body = "i show up in email readers! i do not end with a linebreak!"
@@ -256,15 +257,16 @@ when not defined(testing) and isMainModule and true:
   third.header["Content-Disposition"] = """attachment; filename="third.txt""""
   third.body = "i am a manually attached AND i end with a explicit line break\n"
   multi.parts.add third  
-  # echo "==="
-  # multi.boundary = multi.uniqueBoundary()
 
   var image = newAttachment(readFile("./tests/logo.png"), filename = "logo.png")
-  image.encodeBase64()
+  # image.encodeBase64()
+  image.encodeQuotedPrintables()
+  # image.finalize()
   multi.parts.add(image)
-
   multi.finalize()
   let msg = $multi
+  echo msg
+  # if true: quit()
   ####################################################################################
 
 

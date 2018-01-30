@@ -106,9 +106,11 @@ when isMainModule and testing:
   assert tst2_quoted.quoted("koi8-r").unQuoted("koi8-r").unQuoted("koi8-r") == tst2
   
   assert "=E4=\c\l=E4".unQuoted("iso-8859-1") == "ää"
-  # echo "foo"
-  # assert repeat("a", 73).quoted("iso-8859-1")
-
+  let internat = "Iñtërnâtiônàlizætiøn☃💩"
+  let internatTst = "I=C3=B1t=C3=ABrn=C3=A2ti=C3=B4n=C3=A0liz=C3=A6ti=C3=B8n=E2=98=83=F0=9F=92=\r\n=A9"
+  assert internat.quoted("utf-8") == internatTst
+  assert internatTst.unQuoted("utf-8") == internat
+  
 
 when isMainModule and testing:
   # binary test
@@ -117,3 +119,4 @@ when isMainModule and testing:
   var s = f.quoted("utf-8")
   assert s.unQuoted("utf-8") == f
   echo s
+
