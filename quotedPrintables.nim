@@ -47,7 +47,7 @@ proc quoted*(str: string, destEncoding: string, srcEncoding = "utf-8", newlineAt
       result.add $ch
       lineChars.inc
     else: 
-      if lineChars >= newlineAt - 4: # =FF + '='
+      if lineChars >= newlineAt - 4: # "=FF" + '='
         addCl
       result.add "="
       result.add ch.ord().toHex(2)
@@ -70,14 +70,14 @@ proc unQuoted*(str: string, srcEncoding: string, destEncoding = "utf-8"): string
         var hexNum: char
         try:
           hexNum = buf.parseHexInt.char
+          result.add convert($hexNum, destEncoding, srcEncoding)
         except:
+          # we be robust and do not fail here
           echo "could not parse char:", buf , " at idx ", pos
-        result.add convert($hexNum, destEncoding, srcEncoding)
       else:
         result.add ch
       pos.inc
 
-# echo repeat("rabä", 5000).quoted("iso-8859-1", newLineAt = 76)
 const testing = true
 when isMainModule and testing:
   assert unQuoted("=E4", "iso-8859-1") == "ä"
@@ -95,8 +95,6 @@ when isMainModule and testing:
 
   let tst1 = "Hätten Hüte ein ß im Namen, wären sie möglicherweise keine Hüte mehr,\nsondern Hüße."
   let tst1_quoted = tst1.quoted("iso-8859-1")
-  # echo tst1_quoted
-  # echo tst1_quoted.unQuoted("iso-8859-1")
   assert tst1_quoted.unQuoted("iso-8859-1") == tst1
 
   let tst2 = """Здравствуйте"""
@@ -106,17 +104,16 @@ when isMainModule and testing:
   assert tst2_quoted.quoted("koi8-r").unQuoted("koi8-r").unQuoted("koi8-r") == tst2
   
   assert "=E4=\c\l=E4".unQuoted("iso-8859-1") == "ää"
+
   let internat = "Iñtërnâtiônàlizætiøn☃💩"
   let internatTst = "I=C3=B1t=C3=ABrn=C3=A2ti=C3=B4n=C3=A0liz=C3=A6ti=C3=B8n=E2=98=83=F0=9F=92=\r\n=A9"
   assert internat.quoted("utf-8") == internatTst
   assert internatTst.unQuoted("utf-8") == internat
   
-
 when isMainModule and testing:
   # binary test
   import os
   let f = readFile(getAppFilename())
   var s = f.quoted("utf-8")
   assert s.unQuoted("utf-8") == f
-  echo s
 

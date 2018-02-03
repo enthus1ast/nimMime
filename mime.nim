@@ -36,6 +36,7 @@ type
 
 const 
   headerLimit* = 10_000
+  maxLine = 10_000
   mimeNewline* = "\c\L"
   sep = "--"
   CONTENT_TRANSFER_ENCODING = "Content-Transfer-Encoding"
@@ -250,17 +251,21 @@ proc finalize*(msg: var MimeMessage) =
       part.finalize()
 
 proc mimeEncoder*(txt: string, encoder: ContentTransferEncoders, 
-    line: bool, srcEncoding = "utf-8" ): string = 
+    line = false, srcEncoding = "utf-8", maxLine = maxLine): string = 
   var txtbuf = ""
   case encoder
   of NO_ENCODING: return txt
-  of QUOTED_PRINTABLES: txtbuf = txt.quoted(srcEncoding)
+  of QUOTED_PRINTABLES: txtbuf = txt.quoted(srcEncoding, newlineAt = maxLine)
   of BASE64: txtbuf = txt.encode()
   if line: 
     let shortname = ($encoder)[0] # since 'Q' / 'B' 
     return "=?$#?$#?$#?=" % @[srcEncoding, $shortname, txtbuf]
   return txtbuf
     
+proc encodeWith*(msg: var MimeMessage, encoder: ContentTransferEncoders, srcEncoding = "utf-8") =
+  msg.charset = srcEncoding
+  msg.contentTransferEncoding = encoder
+  msg.body = msg.body.mimeEncoder(encoder, line = false, srcEncoding = srcEncoding)  
 
 proc encodeQuotedPrintables*(msg: var MimeMessage, srcEncoding = "utf-8") =
   ## TODO should this maybe return a new message?
@@ -268,9 +273,10 @@ proc encodeQuotedPrintables*(msg: var MimeMessage, srcEncoding = "utf-8") =
   ## sets transfer encoding header and encodes the message body.
   #  Content-Type: text/plain; charset=ISO-8859-1 
   #  Content-transfer-encoding: base64
-  msg.charset = srcEncoding
-  msg.contentTransferEncoding = QUOTED_PRINTABLES
-  msg.body = msg.body.quoted(srcEncoding)
+  # msg.charset = srcEncoding
+  # msg.contentTransferEncoding = QUOTED_PRINTABLES
+  # msg.body = msg.body.quoted(srcEncoding)
+  msg.encodeWith(QUOTED_PRINTABLES)
 
 proc encodeBase64*(msg: var MimeMessage, srcEncoding = "utf-8") =
   ## TODO should this maybe return a new message?
@@ -278,9 +284,10 @@ proc encodeBase64*(msg: var MimeMessage, srcEncoding = "utf-8") =
   ## sets transfer encoding header and encodes the message body.
   #  Content-Type: text/plain; charset=ISO-8859-1 
   #  Content-transfer-encoding: base64
-  msg.charset = srcEncoding
-  msg.contentTransferEncoding = BASE64
-  msg.body = msg.body.encode()
+  # msg.charset = srcEncoding
+  # msg.contentTransferEncoding = BASE64
+  # msg.body = msg.body.encode()
+  msg.encodeWith(BASE64)
 
 proc needsEncoding*(str: string): bool = 
   for ch in str:
@@ -322,7 +329,7 @@ proc newAttachment*(content, filename: string, encoder = BASE64): MimeMessage =
   result.header[CONTENT_DISPOSITION] = """attachment; filename="$#"""" % @[filename]
   result.header[CONTENT_TYPE] = """$#; name="$#"""" % @[mimetype, filename]
   # Content-Type: image/png; name="canvas2.png"
-  result.body = content
+  result.body = content.mimeEncoder(encoder)
   
 
 
@@ -341,6 +348,14 @@ proc newAttachment*(content, filename: string, encoder = BASE64): MimeMessage =
 #  PGh0bWw+CiAgPGhlYWQ+CiAgPC9oZWFkPgogIDxib2R5PgogICAgPHA+VGhpcyBpcyB0aGUg
 #  Ym9keSBvZiB0aGUgbWVzc2FnZS48L3A+CiAgPC9ib2R5Pgo8L2h0bWw+Cg==
 #  --frontier--"""
+
+# proc parseMime(str: string): MimeMessage =
+#   ## Read header
+#   ## Read body
+#   echo parseHeader("foo: baa, baz\nbaa: baaa, baaaaa")
+#   return MimeMessage()
+
+# echo parseMime("foo: baa, baz")
 
 when isMainModule:
   var test = newMimeHeaders()
@@ -444,16 +459,23 @@ when isMainModule and true:
 
 
 when isMainModule and true:
-  for foo in @["hans", "peter"]:
-    var mail = newMimeMessage()
-    mail.header["to"] = foo & "@example.org"
-    mail.header["subject"] = mimeEncoder("Some umlaute öäü", QUOTED_PRINTABLES, true)
-    mail.body = "Dear $#" % @[foo]
-    if foo == "hans":
-      var forhans = newAttachment("HI HANS!", "readme.png")
-      mail.parts.add forhans
-    mail.finalize()
-    echo $mail
+  for name in @["hans", "peter"]:
+    var envelope = newMimeMessage()
+    envelope.header["to"] = name & "@example.org"
+    envelope.header["subject"] = mimeEncoder("Iñtërnâtiônàlizætiøn☃💩", QUOTED_PRINTABLES, true)
+    envelope.body = "Warning to old clients: This is a multipart MIME message! "
+
+    var msg = newMimeMessage()
+    msg.body = "Dear $# ..." % @[name]
+    envelope.parts.add msg
+    if name == "hans": # only hans gets an attachment
+      var forhans = newAttachment("<content of image.png>", "image.png", BASE64)
+      envelope.parts.add forhans
+
+      var anotherforhans = newAttachment("<content of image.png>", "image.png", QUOTED_PRINTABLES)
+      envelope.parts.add anotherforhans      
+    envelope.finalize()
+    echo $envelope
     echo "===================================================="
 
 # proc encoderImpl(txt: string, encoder: ContentTransferEncoders, 
@@ -462,3 +484,89 @@ when isMainModule and true:
 # when isMainModule and true:
   ## Parser tests
   # let t1 = ""
+
+
+proc parseHeaders(str: string, maxLine = maxLine, headerLimit = headerLimit): MimeHeaders =
+  result = newMimeHeaders()
+  for line in str.splitLines:
+    # lineFut.mget.setLen(0)
+    # lineFut.clean()
+    # await client.recvLineInto(lineFut, maxLength=maxLine)
+
+    if line == "":
+      # client.close(); return
+      return
+    if line.len > maxLine:
+      # await request.respondError(Http413)
+      raise newException(ValueError, "Exceeding maxLine")
+      # client.close(); return
+    if line == "\c\L": break
+    let (key, value) = parseHeader(line)
+    result[key] = value
+    # Ensure the client isn't trying to DoS us.
+    if result.len > headerLimit:
+      raise newException(ValueError, "Exceeding headerLimit")
+      # await client.sendStatus("400 Bad Request")
+      # request.client.close()
+      # return
+
+# # if request.reqMethod == HttpPost:
+# #   # Check for Expect header
+# #   if request.headers.hasKey("Expect"):
+# #     if "100-continue" in request.headers["Expect"]:
+# #       await client.sendStatus("100 Continue")
+# #     else:
+# #       await client.sendStatus("417 Expectation Failed")
+
+# # Read the body
+# # - Check for Content-length header
+# if request.headers.hasKey("Content-Length"):
+#   var contentLength = 0
+#   if parseSaturatedNatural(request.headers["Content-Length"], contentLength) == 0:
+#     await request.respond(Http400, "Bad Request. Invalid Content-Length.")
+#     return
+#   else:
+#     if contentLength > server.maxBody:
+#       await request.respondError(Http413)
+#       return
+#     request.body = await client.recv(contentLength)
+#     if request.body.len != contentLength:
+#       await request.respond(Http400, "Bad Request. Content-Length does not match actual.")
+#       return
+# elif request.reqMethod == HttpPost:
+#   await request.respond(Http411, "Content-Length required.")
+#   return
+
+# # Call the user's callback.
+# await callback(request)
+
+# if "upgrade" in request.headers.getOrDefault("connection"):
+#   return
+
+# # Persistent connections
+# if (request.protocol == HttpVer11 and
+#     cmpIgnoreCase(request.headers.getOrDefault("connection"), "close") != 0) or
+#     (request.protocol == HttpVer10 and
+#     cmpIgnoreCase(request.headers.getOrDefault("connection"), "keep-alive") == 0):
+#   # In HTTP 1.1 we assume that connection is persistent. Unless connection
+#   # header states otherwise.
+#   # In HTTP 1.0 we assume that the connection should not be persistent.
+#   # Unless the connection header states otherwise.
+#   discard
+# else:
+#   request.client.close()
+#   return
+
+
+let a = """to: peter@example.org
+subject: =?utf-8?Q?I=C3=B1t=C3=ABrn=C3=A2ti=C3=B4n=C3=A0liz=C3=A6ti=C3=B8n=E2=98=83=F0=9F=92=A9?=
+content-type: multipart/mixed; boundary="5955470471231252136"; charset=UTF-8
+
+Dear peter
+--5955470471231252136
+content-type: text/plain; charset=UTF-8
+
+
+--5955470471231252136--
+"""
+echo parseHeaders(a)
