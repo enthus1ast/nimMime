@@ -331,6 +331,7 @@ proc newAttachment*(content, filename: string, encoder = BASE64): MimeMessage =
   result = newMimeMessage()
   result.header[CONTENT_DISPOSITION] = """attachment; filename="$#"""" % @[filename]
   result.header[CONTENT_TYPE] = """$#; name="$#"""" % @[mimetype, filename]
+  result.header[CONTENT_TRANSFER_ENCODING] = $encoder
   # Content-Type: image/png; name="canvas2.png"
   result.body = content.mimeEncoder(encoder)
   
