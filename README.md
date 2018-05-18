@@ -59,7 +59,7 @@ example sending email with attachment:
     debug=true
   )
   smtpConn.connect("myemailserver.loc", 587.Port)
-  smtpConn.auth("sender@example.loc, "mypassword")
+  smtpConn.auth("sender@example.loc", "mypassword")
   smtpConn.sendMail("sender@example.org",  @["to@example.org"] , $email.finalize())
   smtpConn.close()  
 ```
