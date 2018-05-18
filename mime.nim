@@ -10,11 +10,7 @@
 ## Contains basic MIME parser/generator
 import tables, strutils, parseutils, random
 import encodings, quotedPrintables, base64
-import mimetypes
-## TODOS:
-## [] add line/header encoding
-## [] 
-
+import mimetypes, ospaths
 type
   ContentTransferEncoders = enum 
     NO_ENCODING = ""
@@ -44,10 +40,8 @@ const
   CONTENT_TYPE = "Content-Type"
 
 proc mimeList*(elems: seq[string]): string =
+  # TODO: should be setter
   return elems.join(", ")
-
-
-
 
 ## 
 # proc mimeTable*(table: OrderedTable[string,string]): string = 
@@ -57,7 +51,6 @@ proc mimeList*(elems: seq[string]): string =
 #     if val.len != 0:
 #       result.add '='
 #       result.add val
-
 
 proc newMimeHeaders*(): MimeHeaders =
   new result
@@ -157,6 +150,7 @@ proc getOrDefault*(headers: MimeHeaders, key: string,
 proc len*(headers: MimeHeaders): int = return headers.table.len
 
 proc parseList(line: string, list: var seq[string], start: int): int =
+  ## FIXME broken by new string rules
   var i = 0
   var current = ""
   while line[start + i] notin {'\c', '\l', '\0'}:
@@ -168,6 +162,7 @@ proc parseList(line: string, list: var seq[string], start: int): int =
     current.setLen(0)
 
 proc parseHeader*(line: string): tuple[key: string, value: seq[string]] =
+  ## FIXME broken by new string rules?
   ## Parses a single raw header HTTP line into key value pairs.
   ##
   ## Used by ``asynchttpserver`` and ``httpclient`` internally and should not
@@ -226,9 +221,9 @@ proc uniqueBoundary*(multi: MimeMessage): string =
       break
 
 proc finalize*(msg: var MimeMessage) = 
-  ## TODO good idea at all? 
-  ## TODO Should `$` do this? Or return a new MimeMessage?
-  ## TODO anyhow here is it for now
+  ## TODO: good idea at all? 
+  ## TODO: Should `$` do this? Or return a new MimeMessage?
+  ## TODO: anyhow here is it for now
   ## Computes and sets a unique multipart boundary, 
   ## after this call the multipart message is ready
   ## to serialize with `$`.
@@ -238,7 +233,7 @@ proc finalize*(msg: var MimeMessage) =
       msg.boundary = msg.uniqueBoundary()
       contentType = """multipart/mixed; boundary="$#"""" % @[msg.boundary]
       # contentType = """multipart/$#; boundary="$#"""" % @[msg.subtype, msg.boundary]
-      # contentType = """multipart; boundary="$#"""" % @[msg.boundary] # TODO
+      # contentType = """multipart; boundary="$#"""" % @[msg.boundary] # TODO:
     else:
       contentType = """$#/$#""" % @[msg.contentType, msg.subtype]
     if msg.charset != "":
@@ -271,28 +266,18 @@ proc encodeWith*(msg: var MimeMessage, encoder: ContentTransferEncoders, srcEnco
   msg.body = msg.body.mimeEncoder(encoder, line = false, srcEncoding = srcEncoding)  
 
 proc encodeQuotedPrintables*(msg: var MimeMessage, srcEncoding = "utf-8") =
-  ## TODO should this maybe return a new message?
-  ## TODO better handling on header params/already encoded messages.
-  ## sets transfer encoding header and encodes the message body.
-  #  Content-Type: text/plain; charset=ISO-8859-1 
-  #  Content-transfer-encoding: base64
-  # msg.charset = srcEncoding
-  # msg.contentTransferEncoding = QUOTED_PRINTABLES
-  # msg.body = msg.body.quoted(srcEncoding)
+  ## TODO: should this maybe return a new message?
+  ## TODO: better handling on header params/already encoded messages.
+  ## sets transfer encoding header and encodes the message body with `quoted printables`
   msg.encodeWith(QUOTED_PRINTABLES)
 
 proc encodeBase64*(msg: var MimeMessage, srcEncoding = "utf-8") =
-  ## TODO should this maybe return a new message?
-  ## TODO better handling on header params/already encoded messages.
-  ## sets transfer encoding header and encodes the message body.
-  #  Content-Type: text/plain; charset=ISO-8859-1 
-  #  Content-transfer-encoding: base64
-  # msg.charset = srcEncoding
-  # msg.contentTransferEncoding = BASE64
-  # msg.body = msg.body.encode()
+  ## TODO: should this maybe return a new message?
+  ## TODO: better handling on header params/already encoded messages.
+  ## sets transfer encoding header and encodes the message body with `base64`
   msg.encodeWith(BASE64)
 
-proc needsEncoding*(str: string): bool = 
+proc needsEncoding*(str: string): bool =
   for ch in str:
     if ch notin MAIL_SAFE:
       return true
@@ -300,7 +285,7 @@ proc needsEncoding*(str: string): bool =
 
 proc needsEncoding*(msg: MimeMessage): bool =
   ## checks if the given message needs encoding
-  # TODO also check the headers or not?
+  # TODO: also check the headers or not?
   if msg.body.needsEncoding: return true
   for key, val in msg.header.pairs:
     if val.needsEncoding: return true
@@ -309,58 +294,22 @@ proc needsEncoding*(msg: MimeMessage): bool =
       if part.needsEncoding: return true
   return false
 
-# proc needsEncoding*(multi: MimeMessageMultipart): bool =
-#   if msg.needsEncoding: return true
-
-  ## If the str is not US-ASCII (or not mailsafe!) it needs to be encoded.
-
-  # try:
-    # echo convert(str, "us-ascii", getCurrentEncoding())
-    
-  #   result = false
-  #   discard
-  # except:
-  #   echo getCurrentExceptionMsg()
-  #   result = true
-import ospaths
-proc newAttachment*(content, filename: string, encoder = BASE64): MimeMessage = 
-  ## 
-  ## TODO encode if not US-ASCII
+proc newAttachment*(content, filename: string, encoder = BASE64): MimeMessage =
+  ## generates a new email attachement
+  ## if the message needs encoding the spezified encoder is used automatically.
+  ## usage:
+  
   var m = newMimetypes()
   var mimetype = m.getMimetype(splitFile(filename).ext)
   result = newMimeMessage()
   result.header[CONTENT_DISPOSITION] = """attachment; filename="$#"""" % @[filename]
   result.header[CONTENT_TYPE] = """$#; name="$#"""" % @[mimetype, filename]
-  result.header[CONTENT_TRANSFER_ENCODING] = $encoder
-  # Content-Type: image/png; name="canvas2.png"
-  result.body = content.mimeEncoder(encoder)
-  
-
-
-# let t1 = """MIME-Version: 1.0
-#  Content-Type: multipart/mixed; boundary=frontier
-
-#  This is a message with multiple parts in MIME format.
-#  --frontier
-#  Content-Type: text/plain
-
-#  This is the body of the message.
-#  --frontier
-#  Content-Type: text/html
-#  Content-Transfer-Encoding: base64
-
-#  PGh0bWw+CiAgPGhlYWQ+CiAgPC9oZWFkPgogIDxib2R5PgogICAgPHA+VGhpcyBpcyB0aGUg
-#  Ym9keSBvZiB0aGUgbWVzc2FnZS48L3A+CiAgPC9ib2R5Pgo8L2h0bWw+Cg==
-#  --frontier--"""
-
-# proc parseMime(str: string): MimeMessage =
-#   ## Read header
-#   ## Read body
-#   echo parseHeader("foo: baa, baz\nbaa: baaa, baaaaa")
-#   return MimeMessage()
-
-# echo parseMime("foo: baa, baz")
-
+  if result.body.needsEncoding():
+    result.header[CONTENT_TRANSFER_ENCODING] = $encoder
+    result.body = content.mimeEncoder(encoder)
+  else:
+    result.body = content
+    
 when isMainModule:
   var test = newMimeHeaders()
   test["Connection"] = @["Upgrade", "Close"]
@@ -370,7 +319,7 @@ when isMainModule:
   doAssert test["Connection", 2] == "Test"
   doAssert "upgrade" in test["Connection"]
 
-  # # Bug #5344.
+  # # Bug #5344. # TODO
   # doAssert parseHeader("foobar: ") == ("foobar", @[""])
   # let (key, value) = parseHeader("foobar: ")
   # test = newMimeHeaders()
@@ -386,7 +335,6 @@ when isMainModule and true:
   msg.addHeaders(test)
   msg.add(mimeNewline)
   msg.add "body content"
-  # echo msg
 
 when isMainModule and false: # multipart test
   var multi = newMimeMessage()
@@ -431,7 +379,7 @@ when isMainModule and false: # multipart in multipart
   multi2.body = "in multi 2"
   
   var normal = newMimeMessage()
-  normal.header["foo"] = "in normal--4292486321577948087--"
+  normal.header["foo"] = "in normal--4292486321577948087--" # TODO test must use parents boundary!
   normal.body = "in normal"
   multi2.parts.add normal
   multi.parts.add multi2
@@ -445,9 +393,8 @@ when isMainModule and true:
   assert "föö".needsEncoding() == true
 
   var lst = newSeq[string]()
-  # discard parseList(@["foo","baa"].mimeList(), lst, 0)  # BUG "new string"
+  # discard parseList(@["foo","baa"].mimeList(), lst, 0)  # TODO "new string"
   # assert lst == @["foo","baa"]
-
 
 # when isMainModule and true:
 #   var mail = newMimeMessage()
@@ -460,7 +407,6 @@ when isMainModule and true:
 #     mail.finalize()
 #     echo $mail
 #     echo "===================================================="
-
 
 when isMainModule and true:
   for name in @["hans", "peter"]:
@@ -482,37 +428,31 @@ when isMainModule and true:
     echo $envelope
     echo "===================================================="
 
+
+### TODO: The parser is not ready yet...
+
+# proc parseMime(str: string): MimeMessage =
+#   ## Read header
+#   ## Read body
+#   echo parseHeader("foo: baa, baz\nbaa: baaa, baaaaa")
+#   return MimeMessage()
+
+# echo parseMime("foo: baa, baz")
 # proc encoderImpl(txt: string, encoder: ContentTransferEncoders, 
 #     line: bool, srcEncoding = "utf-8" ): string = 
 
-# when isMainModule and true:
-  ## Parser tests
-  # let t1 = ""
-
-
-proc parseHeaders(str: string, maxLine = maxLine, headerLimit = headerLimit): MimeHeaders =
-  result = newMimeHeaders()
-  for line in str.splitLines:
-    # lineFut.mget.setLen(0)
-    # lineFut.clean()
-    # await client.recvLineInto(lineFut, maxLength=maxLine)
-
-    if line == "":
-      # client.close(); return
-      return
-    if line.len > maxLine:
-      # await request.respondError(Http413)
-      raise newException(ValueError, "Exceeding maxLine")
-      # client.close(); return
-    if line == "\c\L": break
-    let (key, value) = parseHeader(line)
-    result[key] = value
-    # Ensure the client isn't trying to DoS us.
-    if result.len > headerLimit:
-      raise newException(ValueError, "Exceeding headerLimit")
-      # await client.sendStatus("400 Bad Request")
-      # request.client.close()
-      # return
+# proc parseHeaders(str: string, maxLine = maxLine, headerLimit = headerLimit): MimeHeaders =
+#   result = newMimeHeaders()
+#   for line in str.splitLines:
+#     if line == "":
+#       return
+#     if line.len > maxLine:
+#       raise newException(ValueError, "Exceeding maxLine")
+#     if line == "\c\L": break
+#     let (key, value) = parseHeader(line)
+#     result[key] = value
+#     if result.len > headerLimit:
+#       raise newException(ValueError, "Exceeding headerLimit")
 
 # # if request.reqMethod == HttpPost:
 # #   # Check for Expect header
@@ -561,16 +501,15 @@ proc parseHeaders(str: string, maxLine = maxLine, headerLimit = headerLimit): Mi
 #   request.client.close()
 #   return
 
+# let a = """to: peter@example.org
+# subject: =?utf-8?Q?I=C3=B1t=C3=ABrn=C3=A2ti=C3=B4n=C3=A0liz=C3=A6ti=C3=B8n=E2=98=83=F0=9F=92=A9?=
+# content-type: multipart/mixed; boundary="5955470471231252136"; charset=UTF-8
 
-let a = """to: peter@example.org
-subject: =?utf-8?Q?I=C3=B1t=C3=ABrn=C3=A2ti=C3=B4n=C3=A0liz=C3=A6ti=C3=B8n=E2=98=83=F0=9F=92=A9?=
-content-type: multipart/mixed; boundary="5955470471231252136"; charset=UTF-8
-
-Dear peter
---5955470471231252136
-content-type: text/plain; charset=UTF-8
+# Dear peter
+# --5955470471231252136
+# content-type: text/plain; charset=UTF-8
 
 
---5955470471231252136--
-"""
+# --5955470471231252136--
+# """
 # echo parseHeaders(a)
