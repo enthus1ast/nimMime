@@ -6,8 +6,11 @@ mime.nim is MIME related code mostly copy pasted from
 - smtp.nim
 - asynchttpserver
 
-it also implements "quoted printables" https://en.wikipedia.org/wiki/Quoted-printable
+it implements "quoted printables" https://en.wikipedia.org/wiki/Quoted-printable
 and also introduces a MimeMessage object.
+
+this repository contains a few sdtlib modules, patched to use MimeMessage.
+
 
 A multipart example of an email could look like:
 
@@ -36,5 +39,28 @@ A multipart example of an email could look like:
     envelope.finalize() # computes boundary etc...
     echo $envelope
     echo "===================================================="
+```
+
+  
+example sending email with attachment:
+
+```nim
+  import mime, smtp
+
+  ## Compose your mime message
+  var 
+    file = newAttachment("<i am the file content>", "filename.txt", QUOTED_PRINTABLES)
+    file2 = newAttachment("<i am another file content>", "filename2.txt", BASE64)
+  var email = newEmail("Hello friend", "Iñtërnâtiônàlizætiøn☃💩", "sender@example.org", @["to@example.org"], attachments = @[file,file2])
+
+  ## Send it useing smtp.nim
+  var smtpConn = newSmtp(
+    conf["use_tls"].parseBool,
+    debug=true
+  )
+  smtpConn.connect("myemailserver.loc", 587.Port)
+  smtpConn.auth("sender@example.loc, "mypassword")
+  smtpConn.sendMail("sender@example.org",  @["to@example.org"] , $email.finalize())
+  smtpConn.close()  
 ```
 

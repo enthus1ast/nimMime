@@ -38,7 +38,7 @@ proc quoted*(str: string, destEncoding: string, srcEncoding = "utf-8", newlineAt
   ## encodes into Quoted Printables encoding 
   result = ""
   var lineChars = 0
-  let enc = convert(str,destEncoding, srcEncoding)
+  let enc = convert(str,destEncoding, srcEncoding) # TODO maybe iterate on runes (or so)?
   for ch in enc:
     case ch.char
     of MAIL_SAFE:
@@ -117,3 +117,8 @@ when isMainModule and testing:
   var s = f.quoted("utf-8")
   assert s.unQuoted("utf-8") == f
 
+when isMainModule: #mime kit tests
+  let input = "This is an ordinary text message in which my name (=ED=E5=EC=F9 =EF=E1 =E9=EC=E8=F4=F0)\nis in Hebrew (=FA=E9=F8=E1=F2).";
+  echo input.unQuoted("iso-8859-8", "utf-8") # do we fail here? TODO
+  # const string expected = "This is an ordinary text message in which my name (םולש ןב ילטפנ)\nis in Hebrew (תירבע).";
+  # var encoding = Encoding.GetEncoding ("iso-8859-8");
