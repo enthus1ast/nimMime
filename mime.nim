@@ -16,7 +16,7 @@ import tables, strutils, parseutils, random
 import encodings, quotedPrintables, base64
 import mimetypes, ospaths
 type
-  ContentTransferEncoders = enum 
+  ContentTransferEncoders* = enum 
     NO_ENCODING = ""
     BASE64 = "BASE64"
     QUOTED_PRINTABLES = "QUOTED-PRINTABLE"
