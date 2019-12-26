@@ -2,9 +2,8 @@
 ## Usage example:
 
 
-import tables, strutils, parseutils, random
-import quotedPrintables, base64
-import mimetypes
+import tables, strutils, parseutils, random, base64, mimetypes
+import src/quotedPrintables
 from os import splitFile
 
 type
