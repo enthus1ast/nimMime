@@ -3,9 +3,9 @@
 
 
 import tables, strutils, parseutils, random
-import encodings, quotedPrintables, base64
-import mimetypes, ospaths
-import httpcore
+import quotedPrintables, base64
+import mimetypes
+from os import splitFile
 
 type
   ContentTransferEncoders* = enum
