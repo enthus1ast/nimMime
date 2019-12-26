@@ -15,6 +15,9 @@
 import tables, strutils, parseutils, random
 import encodings, quotedPrintables, base64
 import mimetypes, ospaths
+
+import httpcore
+
 type
   ContentTransferEncoders* = enum
     NO_ENCODING = ""
@@ -164,7 +167,7 @@ proc parseList(line: string, list: var seq[string], start: int): int =
     if line[start + i] == ',':
       i.inc # Skip ,
     current.setLen(0)
-
+#[
 proc parseHeader*(line: string): tuple[key: string, value: seq[string]] =
   ## FIXME broken by new string rules?
   ## Parses a single raw header HTTP line into key value pairs.
@@ -181,7 +184,7 @@ proc parseHeader*(line: string): tuple[key: string, value: seq[string]] =
     result.value = @[""]
   else:
     result.value = @[]
-
+]#
 proc addHeaders*(msg: var string, headers: MimeHeaders) =
   ## From asynchttp
   if headers.len == 0:
@@ -451,13 +454,6 @@ when isMainModule and true: # multipart in multipart
   multi.encodeQuotedPrintables
   echo multi.finalize
 
-when isMainModule and true:
-  assert "foo".needsEncoding() == false
-  assert "föö".needsEncoding() == true
-
-  var lst = newSeq[string]()
-  # discard parseList(@["foo","baa"].mimeList(), lst, 0)  # TODO "new string"
-  # assert lst == @["foo","baa"]
 
 # when isMainModule and true:
 #   var mail = newMimeMessage()
