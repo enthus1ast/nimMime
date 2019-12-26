@@ -196,7 +196,7 @@ proc `$`*(msg: MimeMessage): string =
       if idx == msg.parts.len-1:
         result.add boundaryLineLast # last boundary must be also suffixed by "--"
 
-proc isUniqueBoundary(msgs: seq[MimeMessage], boundary: string): bool =
+proc isUniqueBoundary*(msgs: seq[MimeMessage], boundary: string): bool =
   ## returns true if the given boundary is unique in the msgs
   for msg in msgs:
     if boundary in $msg:
@@ -361,38 +361,6 @@ proc newEmail*(subject, body: string, sender: string, to:seq[string], cc: seq[st
 #   echo m
 #   # echo msg
 
-
-
-# when isMainModule and true:
-#   var mail = newMimeMessage()
-#   for foo in @["hans", "peter"]:
-#     mail.header["to"] = foo & "@example.org"
-#     mail.body = "Dear $#" % @[foo]
-#     if foo == "hans":
-#       var forhans = newAttachment("HI HANS!", "readme.png")
-#       mail.parts.add forhans
-#     mail.finalize()
-#     echo $mail
-#     echo "===================================================="
-
-when isMainModule and true:
-  for name in @["hans", "peter"]:
-    var envelope = newMimeMessage()
-    envelope.header["to"] = name & "@example.org"
-    envelope.header["subject"] = mimeEncoder("Iñtërnâtiônàlizætiøn☃💩", QUOTED_PRINTABLES, forHeader = true)
-    envelope.body = "Warning to old clients: This is a multipart MIME message! "
-
-    var msg = newMimeMessage()
-    msg.body = "Dear $# ..." % @[name]
-    envelope.parts.add msg
-    if name == "hans": # only hans gets an attachment
-      var forhans = newAttachment("<content of image.png>", "image.png", BASE64)
-      envelope.parts.add forhans
-
-      var anotherforhans = newAttachment("<content of image.png>", "image.png", QUOTED_PRINTABLES)
-      envelope.parts.add anotherforhans
-    echo envelope.finalize()
-    echo "===================================================="
 
 
 ### TODO: The parser is not ready yet...
