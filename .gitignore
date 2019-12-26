@@ -1,5 +1,6 @@
 **/nimcache/**
 smtp.ini
 **/private/**
-test
-test.nim
+tests/test
+tests/testmail
+private.txt
