@@ -1,5 +1,3 @@
-# Copyright 2019 - Thomas T. Jarløv
-
 import mime, smtp
 import unittest
 
