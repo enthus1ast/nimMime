@@ -1,21 +1,10 @@
-#
-#
-#            Nim's Runtime Library
-#        (c) Copyright 2018 Nim contributors
-#
-#    See the file "copying.txt", included in this
-#    distribution, for details about the copyright.
-#
-
 ## Contains basic MIME parser/generator
 ## Usage example:
-
 
 
 import tables, strutils, parseutils, random
 import encodings, quotedPrintables, base64
 import mimetypes, ospaths
-
 import httpcore
 
 type
