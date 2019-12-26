@@ -363,14 +363,6 @@ proc newEmail*(subject, body: string, sender: string, to:seq[string], cc: seq[st
 
 
 
-when isMainModule and true:
-  test = newMimeHeaders()
-  var msg = ""
-  test.add("Connection", "Test")
-  msg.addHeaders(test)
-  msg.add(mimeNewline)
-  msg.add "body content"
-
 when isMainModule and false: # multipart test
   var multi = newMimeMessage()
   multi.body = "In multipart messages the body is just a comment for incompatible clients"
