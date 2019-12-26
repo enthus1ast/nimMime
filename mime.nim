@@ -167,24 +167,7 @@ proc parseList(line: string, list: var seq[string], start: int): int =
     if line[start + i] == ',':
       i.inc # Skip ,
     current.setLen(0)
-#[
-proc parseHeader*(line: string): tuple[key: string, value: seq[string]] =
-  ## FIXME broken by new string rules?
-  ## Parses a single raw header HTTP line into key value pairs.
-  ##
-  ## Used by ``asynchttpserver`` and ``httpclient`` internally and should not
-  ## be used by you.
-  result.value = @[]
-  var i = 0
-  i = line.parseUntil(result.key, ':')
-  inc(i) # skip :
-  if i < len(line):
-    i += parseList(line, result.value, i)
-  elif result.key.len > 0:
-    result.value = @[""]
-  else:
-    result.value = @[]
-]#
+
 proc addHeaders*(msg: var string, headers: MimeHeaders) =
   ## From asynchttp
   if headers.len == 0:
