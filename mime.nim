@@ -394,13 +394,7 @@ when isMainModule and true:
     echo envelope.finalize()
     echo "===================================================="
 
-when isMainModule and true:
-  var
-    file = newAttachment("<i am the file content>", "filename.txt", QUOTED_PRINTABLES)
-    file2 = newAttachment("<i am another file content>", "filename2.txt", BASE64)
-  var email = newEmail("Hello friend", "Iñtërnâtiônàlizætiøn☃💩", "sender@example.org", @["to@example.org"], attachments = @[file,file2])
-  # email.finalize()
-  echo email.finalize()
+
 ### TODO: The parser is not ready yet...
 ### FIXME if you like!
 # proc parseMime(str: string): MimeMessage =
