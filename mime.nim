@@ -362,40 +362,6 @@ proc newEmail*(subject, body: string, sender: string, to:seq[string], cc: seq[st
 #   # echo msg
 
 
-
-when isMainModule and false: # multipart test
-  var multi = newMimeMessage()
-  multi.body = "In multipart messages the body is just a comment for incompatible clients"
-  multi.header["to"] = @["foo@nim.org", "baa@nim.org"].mimeList
-  multi.header["subject"] = "multiparted US-ASCII for you"
-
-  var first = newMimeMessage()
-  first.header[CONTENT_TYPE] = "text/plain"
-  first.body = "i show up in email readers! i do not end with a linebreak!"
-  assert first.needsEncoding() == false
-  multi.parts.add first
-
-  var second = newMimeMessage()
-  second.header[CONTENT_TYPE] = "text/plain"
-  second.body = "i am another multipart 42924863215779480875955470471231252136"
-  assert second.needsEncoding() == false
-  multi.parts.add second
-
-  var third = newMimeMessage()
-  third.header[CONTENT_TYPE] = "text/plain"
-  third.header["Content-Disposition"] = """attachment; filename="test.txt""""
-  third.body = "i am manually attached öäü AND i end with a explicit line break\n"
-  if third.needsEncoding():
-    third.encodeQuotedPrintables()
-  multi.parts.add third
-
-  var attachment = newAttachment("i am the filecontent", "filename.png")
-  attachment.encodeBase64()
-  multi.parts.add attachment
-  # assert multi.needsEncoding() == false
-  multi.finalize()
-  echo $multi
-
 when isMainModule and true: # multipart in multipart
   var multi = newMimeMessage()
   multi.header["foo"] = "in multi 1"
