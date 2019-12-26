@@ -362,24 +362,6 @@ proc newEmail*(subject, body: string, sender: string, to:seq[string], cc: seq[st
 #   # echo msg
 
 
-when isMainModule and true: # multipart in multipart
-  var multi = newMimeMessage()
-  multi.header["foo"] = "in multi 1"
-  multi.body = "in multi 1"
-
-  var multi2 = newMimeMessage()
-  multi2.header["foo"] = "in multi2"
-  multi2.body = "in multi 2"
-
-  var normal = newMimeMessage()
-  normal.header["foo"] = "in normal--4292486321577948087--" # TODO test must use parents boundary!
-  normal.body = "in normal"
-  multi2.parts.add normal
-  multi.parts.add multi2
-  multi.parts.add normal
-  multi.encodeQuotedPrintables
-  echo multi.finalize
-
 
 # when isMainModule and true:
 #   var mail = newMimeMessage()
