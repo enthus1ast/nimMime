@@ -331,26 +331,7 @@ proc newEmail*(subject, body: string, sender: string, to:seq[string], cc: seq[st
   # for attachement in attachments:
   result.parts = attachments
 
-  # var first = newMimeMessage()
-  # first.body = "i show up in email readers! i do not end with a linebreak!"
-  # multi.parts.add first
 
-  # var second = newAttachment("i am a file", filename = "second.txt")
-  # multi.parts.add second
-
-  # var third = newMimeMessage()
-  # third.header["Content-Disposition"] = """attachment; filename="third.txt""""
-  # third.body = "i am a manually attached AND i end with a explicit line break\n"
-  # multi.parts.add third
-
-  # var image = newAttachment(readFile("./tests/logo.png"), filename = "logo.png")
-  # # image.encodeBase64()
-  # image.encodeQuotedPrintables()
-  # # image.finalize()
-  # multi.parts.add(image)
-  # multi.finalize()
-  # let msg = $multi
-  # echo msg
 
 # # import tables
 # block:
