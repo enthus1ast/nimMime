@@ -361,22 +361,7 @@ proc newEmail*(subject, body: string, sender: string, to:seq[string], cc: seq[st
 #   echo m
 #   # echo msg
 
-when isMainModule:
-  var test = newMimeHeaders()
-  test["Connection"] = @["Upgrade", "Close"]
-  doAssert test["Connection", 0] == "Upgrade"
-  doAssert test["Connection", 1] == "Close"
-  test.add("Connection", "Test")
-  doAssert test["Connection", 2] == "Test"
-  doAssert "upgrade" in test["Connection"]
 
-  # # Bug #5344. # TODO
-  # doAssert parseHeader("foobar: ") == ("foobar", @[""])
-  # let (key, value) = parseHeader("foobar: ")
-  # test = newMimeHeaders()
-  # test[key] = value
-  # doAssert test["foobar"] == ""
-  # doAssert parseHeader("foobar:") == ("foobar", @[""])
 
 when isMainModule and true:
   test = newMimeHeaders()
