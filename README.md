@@ -2,8 +2,6 @@
 
 Nim's standard library does not support attaching files to emails. This library provides you with the tools to do it.
 
-**WARNING** - This is a fork awaiting feedback from the author at https://github.com/enthus1ast/nimMime.
-
 ____
 
 1. Please note that this is a work in process.
