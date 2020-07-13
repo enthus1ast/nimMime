@@ -237,7 +237,7 @@ proc mimeEncoder*(txt: string, encoder: ContentTransferEncoders,
   case encoder
   of NO_ENCODING: return txt
   of QUOTED_PRINTABLES: txtbuf = txt.quoted(srcEncoding, newlineAt = maxLine)
-  of BASE64: txtbuf = txt.encode(lineLen = maxLine)
+  of BASE64: txtbuf = txt.encodeMIME(lineLen = maxLine)
   if forHeader:
     let shortname = ($encoder)[0] # since 'Q'uoted.. / 'B'ase64.
     return "=?$#?$#?$#?=" % @[srcEncoding, $shortname, txtbuf]
