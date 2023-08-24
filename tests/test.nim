@@ -1,5 +1,6 @@
-import unittest, mime
-import quotedPrintables
+import mime
+import src/quotedPrintables
+import unittest
 import strutils
 
 suite "attachements":
