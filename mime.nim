@@ -2,7 +2,7 @@
 ## Usage example:
 
 
-import tables, strutils, parseutils, random, base64, mimetypes
+import tables, strutils, parseutils, std/random, base64, mimetypes
 import src/quotedPrintables
 from os import splitFile
 

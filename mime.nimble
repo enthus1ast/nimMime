@@ -1,5 +1,5 @@
 # Package
-version       = "0.0.4"
+version       = "0.0.5"
 author        = "enthus1ast"
 description   = "mime generator (email with attachments)"
 license       = "MIT"
