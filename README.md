@@ -1,3 +1,5 @@
+Use https://github.com/openpeeps/openparser/ instead!
+
 # mime - attach files to emails
 
 Nim's standard library does not support attaching files to emails. This library provides you with the tools to do it.
